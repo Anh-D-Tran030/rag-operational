@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Env / secrets
+.env
+*.env.local
+
+# DB files
+*.db
+*.db-shm
+*.db-wal
+
+# Agent pipeline files (local dev tooling, not part of the project)
+.agent-context/
+.claude/
+.agents/
+
+# Markdown is local-only by default (PRD, status, agent memory, contract)
+*.md
+CLAUDE.md
+AGENTS.md
+
+# ...except the docs that ship with the project
+!README.md
+!docs/**/*.md
+
+
+# Local model cache (FlashRank)
+.model_cache/
+
+# Local debug/build logs
+.logs/

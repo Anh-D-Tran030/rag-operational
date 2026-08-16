@@ -1,0 +1,21 @@
+record_id,venue,date,role,count,required_count
+STF-001,Fairfield RSL,2026-05-28,floor_staff,8,8
+STF-002,Fairfield RSL,2026-05-28,bar_staff,4,4
+STF-003,Fairfield RSL,2026-05-28,security,3,3
+STF-004,Fairfield RSL,2026-05-27,floor_staff,6,8
+STF-005,Fairfield RSL,2026-05-27,bar_staff,3,4
+STF-006,Fairfield RSL,2026-05-27,security,3,3
+STF-007,Fairfield RSL,2026-05-26,floor_staff,9,8
+STF-008,Fairfield RSL,2026-05-26,bar_staff,5,4
+STF-009,Fairfield RSL,2026-05-26,security,4,3
+STF-010,Fairfield RSL,2026-05-25,floor_staff,5,8
+STF-011,Fairfield RSL,2026-05-25,bar_staff,2,4
+STF-012,Fairfield RSL,2026-05-25,security,2,3
+STF-013,Fairfield RSL,2026-05-24,floor_staff,8,8
+STF-014,Fairfield RSL,2026-05-24,bar_staff,4,4
+STF-015,Fairfield RSL,2026-05-24,security,3,3
+STF-016,Fairfield RSL,2026-05-23,floor_staff,10,8
+STF-017,Fairfield RSL,2026-05-23,bar_staff,6,4
+STF-018,Fairfield RSL,2026-05-23,security,4,3
+STF-019,Fairfield RSL,2026-05-22,floor_staff,4,8
+STF-020,Fairfield RSL,2026-05-22,security,3,3

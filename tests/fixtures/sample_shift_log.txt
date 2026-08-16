@@ -1,0 +1,46 @@
+FAIRFIELD RSL CLUB — SHIFT LOG
+Date: 2026-05-28
+Shift Type: Evening
+Shift ID: SH-001
+Supervisor: J. Thompson
+
+STAFF ATTENDANCE
+Floor Staff (8): A. Chen, B. Kumar, C. Nguyen, D. Patel, E. Rodriguez, F. Smith, G. Tanaka, H. Wilson
+Bar Staff (4): I. Adams, J. Brown, K. Clark, L. Davis
+Security (3): M. Evans, N. Foster, O. Garcia
+
+SHIFT START — 17:00
+Pre-shift briefing conducted. RSA refresher completed by all floor staff.
+Venue capacity: 450. Expected attendance: ~320.
+
+INCIDENT REPORT — 19:35
+Incident ID: INC-001
+Type: RSA intervention
+Description: Patron at Table 12 (Section B) appeared intoxicated. Floor staff member A. Chen intervened. Patron declined further service and was safely escorted to taxi rank by security (M. Evans). No aggression reported. Patron compliant throughout.
+Severity: low
+Action: Logged in incident register. Duty manager J. Thompson notified.
+
+INCIDENT REPORT — 21:15
+Incident ID: INC-002
+Type: Minor slip-and-fall
+Description: Patron slipped near bar service area (wet floor from spilled drink). No injury sustained. Area cordoned off immediately. Wet floor signs deployed within 2 minutes.
+Severity: low
+Action: Incident form completed. Area inspected. No further hazard identified.
+
+STAFFING NOTE — 20:00
+Two floor staff (D. Patel, E. Rodriguez) requested early leave at 22:00 due to personal reasons. Manager approved. Cover arranged with on-call staff F. Smith extending shift.
+
+COMPLIANCE CHECKS
+RSA signage: Compliant
+Minor prevention (ID checks): 100% compliance — 12 patrons asked for ID, all verified
+Smoking area compliance: All patrons observed smoking in designated area only
+Gaming machine area: No minors observed. Mandatory signage displayed.
+
+SHIFT END — 00:30
+Venue cleared by 00:15. All staff completed end-of-shift duties.
+Cash reconciliation completed by J. Thompson. No discrepancies.
+Security sweep completed at 00:25. Venue secured.
+
+Total patron count (peak): 312
+Total incidents logged: 2
+Supervisor sign-off: J. Thompson — 2026-05-28 00:32

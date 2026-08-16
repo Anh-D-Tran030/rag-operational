@@ -1,0 +1,21 @@
+shift_id,venue,date,staff_count,shift_type,supervisor,notes
+SH-001,Fairfield RSL,2026-05-28,15,Evening,J. Thompson,RSA refresher completed
+SH-002,Fairfield RSL,2026-05-27,12,Afternoon,S. Lee,Normal operations
+SH-003,Fairfield RSL,2026-05-26,18,Evening,J. Thompson,Rugby League event
+SH-004,Fairfield RSL,2026-05-25,10,Morning,R. Patel,Quiet day
+SH-005,Fairfield RSL,2026-05-24,16,Evening,S. Lee,Friday peak
+SH-006,Fairfield RSL,2026-05-23,20,Evening,J. Thompson,Saturday night peak
+SH-007,Fairfield RSL,2026-05-22,8,Morning,R. Patel,Weekend morning
+SH-008,Fairfield RSL,2026-05-21,14,Evening,S. Lee,Normal evening
+SH-009,Fairfield RSL,2026-05-20,11,Afternoon,J. Thompson,Quiet midweek
+SH-010,Fairfield RSL,2026-05-19,17,Evening,S. Lee,Monday special event
+SH-011,Fairfield RSL,2026-05-18,9,Morning,R. Patel,Sunday breakfast
+SH-012,Fairfield RSL,2026-05-17,19,Evening,J. Thompson,Sunday evening
+SH-013,Fairfield RSL,2026-05-16,13,Evening,S. Lee,Saturday afternoon
+SH-014,Fairfield RSL,2026-05-15,10,Morning,R. Patel,Quiet Friday morning
+SH-015,Fairfield RSL,2026-05-14,15,Evening,J. Thompson,Thursday evening
+SH-016,Fairfield RSL,2026-05-13,12,Afternoon,S. Lee,Wednesday
+SH-017,Fairfield RSL,2026-05-12,16,Evening,J. Thompson,Tuesday event
+SH-018,Fairfield RSL,2026-05-11,8,Morning,R. Patel,Monday morning
+SH-019,Fairfield RSL,2026-05-10,14,Evening,S. Lee,Weekend runup
+SH-020,Fairfield RSL,2026-05-09,11,Afternoon,J. Thompson,Saturday afternoon

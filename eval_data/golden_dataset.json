@@ -1,0 +1,182 @@
+[
+  {
+    "question": "What is the RSA intervention protocol for floor staff at Fairfield RSL?",
+    "ground_truth": "Approach the patron calmly, decline further service and offer water, escalate to security on radio channel 3 if needed, and log the intervention in the incident register within 30 minutes.",
+    "evidence_chunk_ids": ["procedure_pdf:section_2.2", "procedure_pdf:section_2.3", "procedure_pdf:section_2.4"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "Which forms of identification are acceptable for entry at Fairfield RSL?",
+    "ground_truth": "Driver Licence, Passport, and NSW Proof of Age card.",
+    "evidence_chunk_ids": ["procedure_pdf:section_3.1"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "What is the licensed patron capacity at Fairfield RSL?",
+    "ground_truth": "450 patrons.",
+    "evidence_chunk_ids": ["compliance_pdf:section_1"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "What are the trading hours at Fairfield RSL on Friday and Saturday?",
+    "ground_truth": "10:00 to 02:00.",
+    "evidence_chunk_ids": ["compliance_pdf:section_1"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "What is the fine range for minor licence violations under the compliance document?",
+    "ground_truth": "Between $5,500 and $11,000.",
+    "evidence_chunk_ids": ["compliance_pdf:section_4"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "What is the emergency procedure for a medical event at the venue?",
+    "ground_truth": "Call 000, apply first aid, and clear the area.",
+    "evidence_chunk_ids": ["procedure_pdf:section_5.1"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "Where is the staff assembly point in case of fire?",
+    "ground_truth": "Assembly Point A.",
+    "evidence_chunk_ids": ["procedure_pdf:section_5.2"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "How frequently is RSA refresher training required at Fairfield RSL?",
+    "ground_truth": "Quarterly.",
+    "evidence_chunk_ids": ["compliance_pdf:section_2"],
+    "category": "simple_lookup"
+  },
+  {
+    "question": "How many staff were rostered on shift SH-001?",
+    "ground_truth": "15 staff.",
+    "evidence_chunk_ids": ["shift_records.csv:SH-001"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "Who supervised shift SH-003?",
+    "ground_truth": "J. Thompson.",
+    "evidence_chunk_ids": ["shift_records.csv:SH-003"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "How many incidents were logged on shift SH-006?",
+    "ground_truth": "Two incidents: INC-005 (underage entry attempt) and INC-006 (property damage).",
+    "evidence_chunk_ids": ["incident_logs.csv:INC-005", "incident_logs.csv:INC-006"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "What was the staff count for shift SH-010?",
+    "ground_truth": "17 staff.",
+    "evidence_chunk_ids": ["shift_records.csv:SH-010"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "What is the severity of incident INC-007?",
+    "ground_truth": "High.",
+    "evidence_chunk_ids": ["incident_logs.csv:INC-007"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "Who signed off the shift log on 2026-05-28?",
+    "ground_truth": "Supervisor J. Thompson.",
+    "evidence_chunk_ids": ["shift_log.txt:supervisor_signoff"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "What was the peak patron count during shift SH-001 on 2026-05-28?",
+    "ground_truth": "312 patrons.",
+    "evidence_chunk_ids": ["shift_log.txt:patron_count"],
+    "category": "table_extraction"
+  },
+  {
+    "question": "Did floor staffing at Fairfield RSL meet the required count on the night of 2026-05-28?",
+    "ground_truth": "Yes — STF-001 records 8 floor staff against the required count of 8 for 2026-05-28.",
+    "evidence_chunk_ids": ["staffing_history.csv:STF-001"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "On which May 2026 shifts did Fairfield RSL fall short of its required floor-staff count?",
+    "ground_truth": "Three shifts: 2026-05-27 (STF-004, 6 of 8), 2026-05-25 (STF-010, 5 of 8), and 2026-05-22 (STF-019, 4 of 8).",
+    "evidence_chunk_ids": ["staffing_history.csv:STF-004", "staffing_history.csv:STF-010", "staffing_history.csv:STF-019"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "Were the high-severity incidents in May 2026 linked to understaffed shifts?",
+    "ground_truth": "No — the two high-severity incidents (INC-005 on SH-006/2026-05-23 and INC-007 on SH-010/2026-05-19) occurred on shifts where staffing met or exceeded the required counts.",
+    "evidence_chunk_ids": ["incident_logs.csv:INC-005", "incident_logs.csv:INC-007", "staffing_history.csv:STF-016"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "Which shift in May 2026 had the largest staff count, and how many incidents were logged on it?",
+    "ground_truth": "SH-006 on 2026-05-23 with 20 staff; two incidents were logged on that shift (INC-005 and INC-006).",
+    "evidence_chunk_ids": ["shift_records.csv:SH-006", "incident_logs.csv:INC-005", "incident_logs.csv:INC-006"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "Was the supervisor on the day of the medical-event incident the same person who supervised shift SH-001?",
+    "ground_truth": "No — INC-007 (medical event) occurred on SH-010 supervised by S. Lee, while SH-001 was supervised by J. Thompson.",
+    "evidence_chunk_ids": ["incident_logs.csv:INC-007", "shift_records.csv:SH-010", "shift_records.csv:SH-001"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "Did Fairfield RSL meet its security staffing requirement on 2026-05-25?",
+    "ground_truth": "No — STF-012 shows 2 security staff against a required count of 3 for that date.",
+    "evidence_chunk_ids": ["staffing_history.csv:STF-012"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "Were RSA interventions on 2026-05-28 logged within the procedure's required time window?",
+    "ground_truth": "Yes — INC-001 and INC-002 were both logged in the incident register on the same shift, meeting the procedure's 30-minute reporting rule (sections 1.4 and 2.4).",
+    "evidence_chunk_ids": ["procedure_pdf:section_1.4", "procedure_pdf:section_2.4", "shift_log.txt:INC-001", "shift_log.txt:INC-002"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "How does Fairfield RSL's RSA-intervention rate on 2026-05-28 compare to other May 2026 evening shifts?",
+    "ground_truth": "Comparable — SH-001 (2026-05-28) logged one RSA intervention (INC-001); other May evening shifts logged one each on 2026-05-24 (INC-004) and 2026-05-10 (INC-010).",
+    "evidence_chunk_ids": ["incident_logs.csv:INC-001", "incident_logs.csv:INC-004", "incident_logs.csv:INC-010"],
+    "category": "multi_hop"
+  },
+  {
+    "question": "What is the price of a schooner of beer at Fairfield RSL?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "Who is the current CEO of Fairfield RSL?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "When was Fairfield RSL founded?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "What is the dress code for entry to Fairfield RSL?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "How much does it cost to book a function room at Fairfield RSL?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "What is the venue Wi-Fi password for patrons?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  },
+  {
+    "question": "How does Fairfield RSL's member loyalty program work?",
+    "ground_truth": "Not available in the provided corpus.",
+    "evidence_chunk_ids": [],
+    "category": "unanswerable"
+  }
+]

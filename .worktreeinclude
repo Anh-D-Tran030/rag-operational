@@ -1,0 +1,29 @@
+# Files copied into every git worktree (--worktree, isolation: worktree
+# subagents, desktop parallel sessions). Only files that match AND are
+# gitignored get copied.
+#
+# Why this file exists: a worktree gets tracked files only. .claude/ and
+# .agent-context/ are gitignored, so without this an agent in a worktree
+# starts with no Stop hook, no test sensor, and no permissions.deny —
+# isolated AND unsupervised, the worst combination.
+#
+# Do NOT replace this with a WorktreeCreate hook: that replaces git worktree
+# creation wholesale and disables .worktreeinclude processing entirely.
+
+.claude/settings.json
+.claude/settings.local.json
+.agent-context/hooks/**
+.agent-context/scripts/**
+.agent-context/skills/run_skill.sh
+.agent-context/project.md
+.agent-context/conventions.md
+.agent-context/domain.md
+.agent-context/pipeline-contract.md
+
+# Deliberately excluded:
+#   status.json, intercom.jsonl, memory/, .heal_state — per-run state; copying
+#     it makes two worktrees believe they are the same run.
+#   skills/<slug>/ — shared success/fail counters would race.
+#   .env, *.db, qdrant_storage/ — no reason for a code-editing worktree to
+#     hold another copy of secrets or local data.
+#   .venv/ — too large; run_tests.sh falls back to python3.

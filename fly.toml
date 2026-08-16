@@ -1,0 +1,41 @@
+# Fly.io app configuration for rag-operational.
+# All LLM calls go to OpenRouter (no GPU, no Ollama).
+# Qdrant is expected at QDRANT_URL (Qdrant Cloud or a separate Fly app).
+app = "rag-operational"
+primary_region = "syd"
+
+[build]
+  # Image is pre-built and pushed to GHCR by the build CI job.
+  # flyctl deploy --image ghcr.io/... --remote-only in the deploy job.
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 150
+
+[[http_service.checks]]
+  grace_period = "45s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  timeout = "5s"
+
+[vm]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+
+[env]
+  LOCAL_PROVIDER = "openrouter"
+  LOCAL_MODEL = "mistralai/mistral-nemo"
+  ROUTER_MODEL = "qwen/qwen3-30b-a3b-instruct-2507"
+  CLOUD_MODEL = "openai/gpt-oss-120b"
+  GATE_MODEL = "qwen/qwen3-30b-a3b-instruct-2507"
+  PROMETHEUS_PORT = "8001"

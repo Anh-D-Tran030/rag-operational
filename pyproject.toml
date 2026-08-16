@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rag-operational"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.*",
+    "uvicorn[standard]",
+    "pydantic>=2.0",
+    "pydantic-settings",
+    "qdrant-client>=1.9",
+    "pymupdf4llm",
+    "sentence-transformers",
+    "flashrank",
+    "httpx",
+    "python-dotenv",
+    "prometheus-client",
+    "prometheus-fastapi-instrumentator==6.1.*",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg",
+    "aiosqlite",
+    "rank-bm25",
+    "openai",
+    "gptcache",
+    "presidio-analyzer>=2.2",
+    "presidio-anonymizer>=2.2",
+    "spacy>=3.7",
+]
+
+[project.optional-dependencies]
+guardrails = ["presidio-analyzer>=2.2", "presidio-anonymizer>=2.2", "spacy>=3.7"]
+# Imported lazily in observability/tracer.py, and only when Langfuse keys are set —
+# the tracer is a silent no-op otherwise, so this stays out of the base install.
+observability = ["langfuse>=3"]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-httpx",
+    "httpx",
+    "ruff",
+    "mypy",
+]
+eval = [
+    "deepeval",
+    "ragas",
+    "datasets",
+    "wandb",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

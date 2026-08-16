@@ -1,0 +1,11 @@
+incident_id,shift_id,venue,date,incident_type,description,severity
+INC-001,SH-001,Fairfield RSL,2026-05-28,RSA intervention,Patron at Table 12 appeared intoxicated and was declined service,low
+INC-002,SH-001,Fairfield RSL,2026-05-28,Slip and fall,Patron slipped near bar area — no injury sustained,low
+INC-003,SH-003,Fairfield RSL,2026-05-26,Altercation,Two patrons argued near gaming machines — security intervened,medium
+INC-004,SH-005,Fairfield RSL,2026-05-24,RSA intervention,Patron refused service after three drinks — left voluntarily,low
+INC-005,SH-006,Fairfield RSL,2026-05-23,Underage attempt,Patron attempted entry without valid ID — refused at door,high
+INC-006,SH-006,Fairfield RSL,2026-05-23,Property damage,Patron knocked over glassware — minor clean-up required,low
+INC-007,SH-010,Fairfield RSL,2026-05-19,Medical event,Patron reported chest pain — ambulance called — patron recovered,high
+INC-008,SH-012,Fairfield RSL,2026-05-17,Noise complaint,External noise complaint from neighbouring property — music reduced,low
+INC-009,SH-016,Fairfield RSL,2026-05-13,Theft,Patron reported missing wallet — police notified — unresolved,medium
+INC-010,SH-019,Fairfield RSL,2026-05-10,RSA intervention,Patron showed signs of intoxication — escorted safely to taxi,low
