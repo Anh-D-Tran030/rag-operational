@@ -10,6 +10,9 @@
     "openai": {
       "type": "api"
     },
+    "deepseek": {
+      "options": { "apiKey": "{env:DEEPSEEK_API_KEY}" }
+    },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "options": { "baseURL": "http://localhost:11434/v1" },
@@ -21,7 +24,7 @@
   },
   "agent": {
     "plan": {
-      "model": "anthropic/claude-sonnet-4.6",
+      "model": "deepseek/deepseek-v4-pro",
       "temperature": 0.0,
       "steps": 10,
       "permission": {
@@ -31,7 +34,7 @@
       "description": "Read-only plan authoring. Writes plan.md then locks it."
     },
     "build": {
-      "model": "openai/gpt-5.5-codex",
+      "model": "deepseek/deepseek-v4-pro",
       "temperature": 0.2,
       "steps": 25,
       "permission": {
@@ -49,7 +52,7 @@
       "description": "Reads plan.md and explore.md. Implements only files listed in plan.md. Reads trace.md for errors — never raw logs."
     },
     "code-reviewer": {
-      "model": "ollama/qwen2.5-coder:7b-16k",
+      "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.1,
       "steps": 15,
       "permission": {
@@ -59,7 +62,7 @@
       "description": "Code quality, logic bugs, syntax checks. Outputs to review.md. SECURITY VIOLATION blocks git commit."
     },
     "tester": {
-      "model": "ollama/qwen2.5-coder:7b-16k",
+      "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.1,
       "steps": 20,
       "permission": {
@@ -69,7 +72,7 @@
       "description": "Writes and runs pytest tests. Failure output piped to compressor before build reads it."
     },
     "explore": {
-      "model": "ollama/qwen3:4b-16k",
+      "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.0,
       "steps": 15,
       "permission": {
@@ -85,7 +88,7 @@
       "description": "Read-only grep and schema exploration. Outputs findings to explore.md."
     },
     "compressor": {
-      "model": "ollama/qwen3:4b-16k",
+      "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.0,
       "steps": 5,
       "permission": {
@@ -95,7 +98,7 @@
       "description": "Compresses raw error output into trace.md. Always called before Build reads any error output."
     },
     "docs-writer": {
-      "model": "ollama/qwen3:4b-16k",
+      "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.3,
       "steps": 8,
       "permission": {

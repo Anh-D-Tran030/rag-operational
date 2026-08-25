@@ -50,13 +50,26 @@ async def handle_query(
     """
     t_total = time.monotonic()
 
+    # Redact PII before cache lookup so cached entries never contain raw PII.
+    # Timing is captured here; the Langfuse span is logged after start_trace
+    # because trace_obj doesn't exist until then.
+    t_pii_in = time.monotonic()
     query = redact_pii(query, label="input")
+    _pii_in_ms = (time.monotonic() - t_pii_in) * 1000
 
     cached = await cache.get(query)
     if cached is not None:
         return cached
 
     trace_id, trace_obj = tracer.start_trace(name="query", user_query=query)
+    tracer.log_span(
+        trace_obj=trace_obj,
+        name="pii_redaction",
+        input={"label": "input"},
+        output={"processed": True},
+        latency_ms=_pii_in_ms,
+        metadata={"stage": "input"},
+    )
 
     t0 = time.monotonic()
     intent = await classify_intent(query, settings.local_llm(settings.router_model))
@@ -168,7 +181,16 @@ async def handle_query(
             "The generated answer could not be verified against the retrieved context. "
             "Please rephrase your question or consult the source documents directly."
         )
+    t_pii_out = time.monotonic()
     answer = redact_pii(str(answer), label="output")
+    tracer.log_span(
+        trace_obj=trace_obj,
+        name="pii_redaction",
+        input={"label": "output"},
+        output={"processed": True},
+        latency_ms=(time.monotonic() - t_pii_out) * 1000,
+        metadata={"stage": "output"},
+    )
 
     est_cost = len(prompt.split()) * 0.000003 + len(str(answer).split()) * 0.000015
     rag_query_cost_usd.observe(est_cost)

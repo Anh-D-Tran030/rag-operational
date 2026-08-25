@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import Settings
 from src.llm_client import chat
+from src.observability.metrics import rag_sql_execution_errors
 
 _DML_PATTERN = re.compile(
     r"^\s*(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE)\b",
@@ -133,6 +134,7 @@ async def text_to_sql_tool(
             rows = await execute_sql(sql, settings.db_url)
             return {"rows": rows, "sql_used": sql, "view_names": view_names, "trace_id": trace_id}
         except RuntimeError as exc:
+            rag_sql_execution_errors.inc()
             last_error = str(exc)
 
     return {"rows": [], "error": last_error}

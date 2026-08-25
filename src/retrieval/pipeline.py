@@ -12,7 +12,11 @@ import time
 from qdrant_client import AsyncQdrantClient
 
 from src.config import Settings
-from src.observability.metrics import rag_chunks_per_query, rag_retrieval_confidence
+from src.observability.metrics import (
+    rag_agent_iterations,
+    rag_chunks_per_query,
+    rag_retrieval_confidence,
+)
 from src.observability.tracer import RAGTracer
 from src.retrieval.embedder import embed_query
 from src.retrieval.query_expander import expand_query
@@ -136,6 +140,7 @@ async def vector_search_pipeline(
 
     latency_s = time.monotonic() - t0
 
+    rag_agent_iterations.observe(float(iterations))
     if chunks:
         score = float(chunks[0].get("rerank_score", chunks[0].get("score", 0.0)))
         rag_retrieval_confidence.observe(score)

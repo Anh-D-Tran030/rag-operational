@@ -162,34 +162,45 @@ Full rationale with context, trade-offs, and benchmarks in `docs/design_decision
 
 ## Evaluation Results
 
-Measured 2026-08-15 against the live Qdrant + OpenRouter stack.  Judge model:
+Measured 2026-08-21 against the live Qdrant + OpenRouter stack. Judge model:
 `openai/gpt-oss-120b`. Contexts truncated to 600 chars/citation to stay within
-the model's output budget.  See `docs/incident_log.md` for the grounded/ungrounded
+the model's output budget. See `docs/incident_log.md` for the grounded/ungrounded
 probe that drove gate model selection.
 
-| Metric | Threshold | Measured (5q smoke) |
+| Metric | Threshold | Measured (30q full) |
 |:-------|:----------|:--------------------|
 | faithfulness | ≥ 0.9 | 0.65 ⚠ below threshold |
-| answer_relevancy | ≥ 0.8 | 0.88 ✓ |
+| answer_relevancy | ≥ 0.8 | 0.41 ⚠ below threshold |
 | context_precision | ≥ 0.8 | 0.00 ⚠ below threshold |
-| context_recall | ≥ 0.8 | 0.80 ✓ |
-| MRR | tracked | 0.63 |
-| nDCG@10 | tracked | 0.67 |
+| context_recall | ≥ 0.8 | 0.22 ⚠ below threshold |
+| MRR | tracked | 0.28 |
+| nDCG@10 | tracked | 0.27 |
 
-Run `python3 scripts/run_eval.py` (full 30-question dataset) to get stable estimates.
-The 5-question smoke run is intentionally noisy; faithfulness and context_precision
-are expected to improve with more samples.
+> Live eval run: 2026-08-21, 30 golden QA pairs (23 with evidence ids for the
+> retrieval metrics; the remaining 7 are unanswerable-by-design), Qdrant +
+> `mistralai/mistral-nemo` + `openai/gpt-oss-120b`.
+
+The full 30-question run is materially harder than the earlier 5-question smoke
+(2026-08-15): answer_relevancy, context_recall, MRR, and nDCG@10 all drop
+sharply, and `context_precision` remains 0.00 — indicating retrieved chunks
+are not aligning with the ground-truth evidence ids in the golden dataset for
+the majority of questions. This is the honest floor; see M6 known limitations
+for the retrieval-quality workstream (contextual-prefix regeneration and BM25
+tokenizer review) needed before publishing improvements.
 
 ---
 
 ## Load Test Results
 
-Measured 2026-08-15: 40 requests, 10 concurrency, OpenRouter backend.
+Measured 2026-08-17: 200 requests, 50 concurrency, OpenRouter backend (qwen3-30b-a3b for routing, gpt-oss-120b for generation).
 Latency is dominated by OpenRouter round-trip; local embed + rerank add < 200 ms.
+p95/p99 values at exactly 30 s reflect the client-side timeout; 33/200 requests timed out at that ceiling.
 
 | Metric | Simple | Complex | All |
 |:-------|:-------|:--------|:----|
-| p50 latency (ms) | — | — | — |
-| p95 latency (ms) | 21 477 | 42 049 | — |
-| p99 latency (ms) | — | — | — |
-| throughput (req/s) | — | — | — |
+| p50 latency (ms) | 17 753 | 22 129 | 20 290 |
+| p95 latency (ms) | 30 011 | 30 029 | 30 020 |
+| p99 latency (ms) | 30 030 | 30 031 | 30 030 |
+| throughput (req/s) | n/a | n/a | 2.5 |
+
+> Load test run: 2026-08-17, 50 concurrent users, 200 total requests.

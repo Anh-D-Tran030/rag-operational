@@ -63,9 +63,25 @@ def _build_judge(settings: Settings):
         api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
         max_retries=0,  # RAGAS handles retries at a higher level; SDK retries cause loops
+        timeout=60.0,   # hard per-request timeout — the SDK default is 10 min, and
+                        # one hung OpenRouter call otherwise deadlocks the eval
     )
     llm = llm_factory(model=settings.judge_model, client=client)
-    embeddings = LangchainEmbeddingsWrapper(LCHFEmbeddings(model_name=settings.embedding_model))
+    device = os.environ.get("RAG_EMBEDDER_DEVICE")
+    if not device:
+        try:
+            import torch  # noqa: PLC0415
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            device = "cpu"
+    embeddings = LangchainEmbeddingsWrapper(
+        LCHFEmbeddings(
+            model_name=settings.embedding_model,
+            model_kwargs={"device": device},
+        )
+    )
+    print(f"[eval] RAGAS embedder device: {device}", flush=True)
     return llm, embeddings
 
 

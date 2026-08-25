@@ -1,7 +1,7 @@
 """Integration tests for src/generation/query_handler.py."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
@@ -143,3 +143,59 @@ async def test_empty_results_returns_insufficient_context(settings, tracer, cach
         result = await handle_query("unknowable question", mock_client, settings, tracer, cache)
 
     assert result["answer"] == "insufficient context"
+
+
+@pytest.mark.asyncio
+async def test_pii_input_span_logged(settings, cache):
+    """Input-path redaction must emit a pii_redaction Langfuse span."""
+    mock_client = AsyncMock()
+    mock_chunk = _make_chunk()
+
+    mock_tracer = MagicMock()
+    mock_tracer.start_trace.return_value = ("trace-pii", MagicMock())
+
+    with (
+        patch(
+            "src.generation.query_handler.classify_intent",
+            return_value={"tool": "vector_search", "complexity": "simple"},
+        ),
+        patch(
+            "src.generation.query_handler.vector_search_pipeline",
+            return_value=([mock_chunk], {}),
+        ),
+        patch("src.generation.query_handler.generate_local", return_value="answer text"),
+        patch("src.generation.query_handler.check_faithfulness", return_value=True),
+    ):
+        await handle_query("hello world", mock_client, settings, mock_tracer, cache)
+
+    span_calls = [c for c in mock_tracer.log_span.call_args_list if c.kwargs.get("name") == "pii_redaction"]
+    input_spans = [c for c in span_calls if c.kwargs.get("metadata", {}).get("stage") == "input"]
+    assert len(input_spans) >= 1, "expected a pii_redaction span with stage=input"
+
+
+@pytest.mark.asyncio
+async def test_pii_output_span_logged(settings, cache):
+    """Output-path redaction must emit a pii_redaction Langfuse span."""
+    mock_client = AsyncMock()
+    mock_chunk = _make_chunk()
+
+    mock_tracer = MagicMock()
+    mock_tracer.start_trace.return_value = ("trace-pii", MagicMock())
+
+    with (
+        patch(
+            "src.generation.query_handler.classify_intent",
+            return_value={"tool": "vector_search", "complexity": "simple"},
+        ),
+        patch(
+            "src.generation.query_handler.vector_search_pipeline",
+            return_value=([mock_chunk], {}),
+        ),
+        patch("src.generation.query_handler.generate_local", return_value="answer text"),
+        patch("src.generation.query_handler.check_faithfulness", return_value=True),
+    ):
+        await handle_query("hello world", mock_client, settings, mock_tracer, cache)
+
+    span_calls = [c for c in mock_tracer.log_span.call_args_list if c.kwargs.get("name") == "pii_redaction"]
+    output_spans = [c for c in span_calls if c.kwargs.get("metadata", {}).get("stage") == "output"]
+    assert len(output_spans) >= 1, "expected a pii_redaction span with stage=output"

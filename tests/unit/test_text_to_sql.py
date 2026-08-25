@@ -61,6 +61,38 @@ async def test_execute_sql_happy_path():
 
 
 @pytest.mark.asyncio
+async def test_sql_execution_error_increments_counter():
+    """rag_sql_execution_errors is incremented once per failed execute_sql call."""
+    raw = "```sql\nSELECT 1\n```"
+
+    from src.config import Settings
+    settings = Settings(openrouter_api_key="fake", db_url=_DB)
+
+    with (
+        patch("src.retrieval.text_to_sql.chat", AsyncMock(return_value=raw)),
+        patch("src.retrieval.text_to_sql.validate_sql", AsyncMock(return_value=(True, ""))),
+        patch(
+            "src.retrieval.text_to_sql.execute_sql",
+            AsyncMock(side_effect=RuntimeError("table not found")),
+        ),
+        patch("src.retrieval.text_to_sql.rag_sql_execution_errors") as mock_counter,
+    ):
+        result = await text_to_sql_tool(
+            query="get data",
+            relevant_views=[{
+                "view_name": "v_shift_summary",
+                "columns": ["venue"],
+                "description": "shift data",
+            }],
+            settings=settings,
+            trace_id="trace-err",
+        )
+
+    mock_counter.inc.assert_called_once()
+    assert "error" in result or result.get("rows") == []
+
+
+@pytest.mark.asyncio
 async def test_self_correction_tries_next_candidate():
     raw = "```sql\nINSERT INTO t VALUES (1)\n```\n```sql\nSELECT 1 AS ok\n```"
 
