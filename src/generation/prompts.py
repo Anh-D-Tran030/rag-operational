@@ -5,8 +5,9 @@ from __future__ import annotations
 def build_vector_rag_prompt(query: str, chunks: list[dict]) -> str:
     """Build a prompt grounded in retrieved document chunks.
 
-    Instructs the LLM to answer only from provided context and cite
-    doc_type, venue, date, and page_num for every fact used.
+    Instructs the LLM to answer only from provided context. Each chunk keeps
+    its doc_type/venue/date/page metadata; citations are assembled by the
+    caller from that metadata, not requested of the model.
     """
     context_parts = []
     for i, c in enumerate(chunks, 1):
@@ -19,8 +20,7 @@ def build_vector_rag_prompt(query: str, chunks: list[dict]) -> str:
 
     context = "\n\n".join(context_parts)
     return (
-        "Answer only from the provided context. "
-        "Cite doc_type, venue, date, and page_num for each fact you use.\n\n"
+        "Answer only from the provided context.\n\n"
         f"Context:\n{context}\n\n"
         f"Question: {query}\n\nAnswer:"
     )
@@ -34,10 +34,11 @@ def build_hybrid_prompt(
     """Build a prompt fusing vector chunks with SQL result rows.
 
     SQL result rows are formatted as a markdown table. Vector chunks are
-    shown as cited context below.
+    shown below with their metadata; citations are assembled by the caller,
+    not requested of the model.
     """
     parts: list[str] = [
-        "Answer only from the provided context. Cite your sources.\n\n"
+        "Answer only from the provided context.\n\n"
         f"Question: {query}\n"
     ]
 
