@@ -11,6 +11,7 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic>=2.0",
     "pydantic-settings",
+    "PyYAML==6.0.3",
     "qdrant-client>=1.9",
     "pymupdf4llm",
     "sentence-transformers",
@@ -43,11 +44,16 @@ dev = [
     "ruff",
     "mypy",
 ]
+# Exact pins: ragas_runner imports a private ragas module, and the rest carry
+# security floors. Install via requirements/eval-py314.lock into .venv-eval —
+# langchain-openai caps openai<3, so this set cannot share the runtime .venv.
 eval = [
-    "deepeval",
-    "ragas",
-    "datasets",
-    "wandb",
+    "ragas==0.4.3",
+    "langchain-community==0.4.1",
+    "langchain-openai==1.4.3",
+    "datasets==5.0.1",
+    "deepeval==4.2.5",
+    "wandb==0.30.0",
 ]
 
 [tool.ruff]

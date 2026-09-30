@@ -16,14 +16,20 @@ def test_vector_prompt_has_doc_type():
     assert "Staff must be 5." in prompt
 
 
-def test_vector_prompt_instructs_citation():
+def test_vector_prompt_keeps_metadata_without_citation_instruction():
     chunks = [{
         "doc_type": "sop", "content": "Evacuate immediately.",
         "page_num": 1, "venue": "RSL", "date": "2026-01-01", "shift_id": None,
     }]
     prompt = build_vector_rag_prompt("What to do in emergency?", chunks)
-    assert "doc_type" in prompt
-    assert "page_num" in prompt
+    # Citations are assembled by the caller; the model is not asked to cite.
+    assert "cite" not in prompt.lower()
+    assert "page_num" not in prompt
+    # The chunk metadata itself stays in the context block.
+    assert "doc_type=sop" in prompt
+    assert "venue=RSL" in prompt
+    assert "date=2026-01-01" in prompt
+    assert "page=1" in prompt
 
 
 def test_hybrid_prompt_has_sql_table():

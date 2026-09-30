@@ -3,8 +3,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
-    qdrant_collection: str = "rag_operational"
-    qdrant_schema_collection: str = "rag_schema_meta"
+    qdrant_api_key: str = ""
+    qdrant_collection: str = "rag_operational_v1"
+    qdrant_schema_collection: str = "rag_schema_meta_v1"
     ollama_url: str = "http://localhost:11434"
     ollama_model_router: str = "llama3.2:3b"
     # Routing, query expansion and simple-query generation. "ollama" keeps these on
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 64
     retrieval_top_k: int = 50
     rerank_top_n: int = 7
-    rerank_score_threshold: float = 0.3
+    rerank_score_threshold: float = 0.1
     max_retrieval_iterations: int = 5
     token_budget_per_query: int = 4000
     db_url: str = "sqlite+aiosqlite:///./operational.db"
@@ -49,7 +50,10 @@ class Settings(BaseSettings):
     langfuse_host: str = ""
     prometheus_port: int = 8001
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # extra="ignore": .env is shared with peripheral tooling (deepeval, eval scripts)
+    # whose own keys this Settings class has no reason to declare. Without this,
+    # pydantic-settings rejects the whole file over one unrecognized key.
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     def local_llm(self, model: str | None = None):
         """Bundle the small-model settings for src.llm_client.complete.

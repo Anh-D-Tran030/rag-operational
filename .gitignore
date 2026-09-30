@@ -39,3 +39,5 @@ AGENTS.md
 
 # Local debug/build logs
 .logs/
+# Separate eval environment (requirements/eval-py314.lock)
+.venv-eval/

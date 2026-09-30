@@ -57,3 +57,25 @@ async def test_openrouter_provider_expands_without_ollama():
     ):
         result = await expand_query(query="original", config=_OPENROUTER, n_expansions=2)
     assert result == ["original", "alt one", "alt two"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config", [_OLLAMA, _OPENROUTER], ids=["local", "openrouter"])
+async def test_prompt_requests_terminology_and_output_is_bounded(config):
+    mock = AsyncMock(return_value="SOP 12 staff\nsop 12 STAFF\nSOP-12 minimum\nextra\nmore")
+    with patch("src.retrieval.query_expander.complete", mock):
+        result = await expand_query(query="SOP-12 minimum", config=config, n_expansions=2)
+    prompt = mock.await_args.args[0]
+    assert "abbreviations" in prompt and "section headings" in prompt
+    assert "named entity" in prompt and "Query: SOP-12 minimum" in prompt
+    assert mock.await_args.args[1] is config
+    assert result == ["SOP-12 minimum", "SOP 12 staff", "extra"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config", [_OLLAMA, _OPENROUTER], ids=["local", "openrouter"])
+async def test_provider_error_falls_back_to_original(config):
+    mock = AsyncMock(side_effect=RuntimeError("provider down"))
+    with patch("src.retrieval.query_expander.complete", mock):
+        result = await expand_query(query="original", config=config)
+    assert result == ["original"]

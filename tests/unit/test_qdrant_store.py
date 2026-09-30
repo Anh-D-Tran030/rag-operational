@@ -3,7 +3,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.ingestion.qdrant_store import ensure_collection, upsert_chunks
+from src.ingestion.qdrant_store import (
+    deterministic_point_id,
+    ensure_collection,
+    upsert_chunks,
+)
 
 REQUIRED_PAYLOAD_FIELDS = [
     "page_num", "doc_type", "date", "venue", "shift_id",
@@ -54,3 +58,70 @@ async def test_ensure_collection_creates():
 
     await ensure_collection(mock_client, "new_collection", 384)
     mock_client.create_collection.assert_called_once()
+
+
+def test_deterministic_point_id_is_stable_and_source_scoped():
+    chunk = {"page_num": 1, "chunk_index": 2, "content_hash": "abc"}
+
+    first = deterministic_point_id("v1", "procedure", chunk)
+    second = deterministic_point_id("v1", "procedure", chunk)
+
+    assert first == second
+    assert first != deterministic_point_id("v1", "compliance", chunk)
+
+
+@pytest.mark.asyncio
+async def test_repeat_manifest_upsert_reuses_point_id():
+    captured = []
+    client = MagicMock()
+    client.upsert = AsyncMock(side_effect=lambda **kwargs: captured.append(kwargs["points"]))
+    chunks = [{
+        "content": "stable", "page_num": 1, "chunk_index": 0,
+        "content_hash": "abc", "embedding": [0.1] * 384,
+    }]
+
+    for _ in range(2):
+        await upsert_chunks(
+            client, "rag_operational_v1", chunks, {}, corpus_version="v1",
+            manifest_digest="digest", source_id="procedure_pdf",
+        )
+
+    assert captured[0][0].id == captured[1][0].id
+    assert captured[0][0].payload["manifest_digest"] == "digest"
+
+
+@pytest.mark.asyncio
+async def test_existing_collection_rejects_different_manifest():
+    client = MagicMock()
+    collections = MagicMock()
+    collection = MagicMock()
+    collection.name = "rag_operational_v1"
+    collections.collections = [collection]
+    client.get_collections = AsyncMock(return_value=collections)
+    info = MagicMock()
+    info.config.params.vectors = {"dense": MagicMock(size=384)}
+    client.get_collection = AsyncMock(return_value=info)
+    point = MagicMock(payload={"corpus_version": "v1", "manifest_digest": "old"})
+    client.scroll = AsyncMock(return_value=([point], None))
+
+    with pytest.raises(ValueError, match="different corpus"):
+        await ensure_collection(
+            client, "rag_operational_v1", 384, corpus_version="v1",
+            manifest_digest="new",
+        )
+
+
+@pytest.mark.asyncio
+async def test_existing_collection_rejects_wrong_vector_size():
+    client = MagicMock()
+    collections = MagicMock()
+    collection = MagicMock()
+    collection.name = "rag_operational_v1"
+    collections.collections = [collection]
+    client.get_collections = AsyncMock(return_value=collections)
+    info = MagicMock()
+    info.config.params.vectors = {"dense": MagicMock(size=768)}
+    client.get_collection = AsyncMock(return_value=info)
+
+    with pytest.raises(ValueError, match="incompatible vectors"):
+        await ensure_collection(client, "rag_operational_v1", 384)

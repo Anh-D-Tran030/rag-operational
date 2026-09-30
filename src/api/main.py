@@ -26,7 +26,10 @@ async def lifespan(app: FastAPI):
     settings = Settings()
     app.state.settings = settings
 
-    app.state.qdrant_client = AsyncQdrantClient(url=settings.qdrant_url)
+    app.state.qdrant_client = AsyncQdrantClient(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key or None,
+    )
     app.state.tracer = RAGTracer(
         public_key=settings.langfuse_public_key,
         secret_key=settings.langfuse_secret_key,
@@ -42,6 +45,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    from src.retrieval.reranker import shutdown_reranker_executor
+
+    shutdown_reranker_executor()
     await app.state.qdrant_client.close()
     await app.state.db_engine.dispose()
 
@@ -60,6 +66,61 @@ Instrumentator().instrument(app).expose(app)
 app.include_router(query_router)
 app.include_router(ingest_router)
 app.include_router(feedback_router)
+
+
+@app.get("/ready")
+async def ready(response: Response) -> dict:
+    """Validate that the configured corpus can serve runtime requests.
+
+    This is deliberately read-only: corpus bootstrap provisions Qdrant and
+    SQLite, while readiness only checks the collections selected by runtime
+    configuration.
+    """
+    settings: Settings = app.state.settings
+    checks: dict[str, dict[str, str | int]] = {}
+
+    try:
+        async with app.state.db_engine.connect() as conn:
+            await conn.execute(sqlalchemy_text("SELECT 1"))
+        checks["database"] = {"status": "ok"}
+    except Exception:
+        checks["database"] = {"status": "unavailable"}
+
+    try:
+        collections = {
+            item.name for item in (await app.state.qdrant_client.get_collections()).collections
+        }
+    except Exception:
+        checks["document_collection"] = {"status": "unavailable"}
+        checks["schema_collection"] = {"status": "unavailable"}
+    else:
+        for check_name, collection_name in (
+            ("document_collection", settings.qdrant_collection),
+            ("schema_collection", settings.qdrant_schema_collection),
+        ):
+            if collection_name not in collections:
+                checks[check_name] = {
+                    "status": "collection_missing",
+                    "collection": collection_name,
+                }
+                continue
+            try:
+                info = await app.state.qdrant_client.get_collection(collection_name)
+                points = info.points_count or 0
+                checks[check_name] = (
+                    {"status": "ok", "collection": collection_name, "points": points}
+                    if points > 0
+                    else {"status": "collection_empty", "collection": collection_name}
+                )
+            except Exception:
+                checks[check_name] = {
+                    "status": "unavailable",
+                    "collection": collection_name,
+                }
+
+    is_ready = all(check["status"] == "ok" for check in checks.values())
+    response.status_code = 200 if is_ready else 503
+    return {"status": "ready" if is_ready else "not_ready", "checks": checks}
 
 
 @app.get("/health")

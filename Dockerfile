@@ -67,6 +67,7 @@ ENV TRANSFORMERS_OFFLINE=1 \
 COPY src ./src
 COPY tests/fixtures ./tests/fixtures
 COPY scripts ./scripts
+COPY corpus ./corpus
 COPY eval_data ./eval_data
 
 # Seed the read-only operational database at build time so the runtime filesystem

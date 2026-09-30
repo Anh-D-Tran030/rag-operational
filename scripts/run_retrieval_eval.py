@@ -12,11 +12,11 @@ Prints a per-question row and an aggregate summary. Writes .logs/retrieval_eval_
 Usage:
     .venv/bin/python scripts/run_retrieval_eval.py
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
-import math
 import os
 import sys
 import time
@@ -31,6 +31,9 @@ from src.observability.tracer import RAGTracer
 from src.retrieval.cache import SemanticCache
 
 GOLDEN_PATH = "eval_data/golden_dataset.json"
+DOCUMENT_QUERY_IDS = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 14, 15})
+SQL_QUERY_IDS = frozenset({9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 23})
+HYBRID_QUERY_IDS = frozenset({22})
 
 
 async def main() -> int:
@@ -110,21 +113,28 @@ async def main() -> int:
     await asyncio.gather(*[_run_one(i, case) for i, case in enumerate(golden)])
 
     rows_clean = [r for r in rows if r is not None]
-    mrr_scores = [r["mrr"] for r in rows_clean if r.get("mrr") is not None]
-    ndcg_scores = [r["ndcg"] for r in rows_clean if r.get("ndcg") is not None]
+    mrr_scores = [r["mrr"] for r in rows_clean if r["i"] in DOCUMENT_QUERY_IDS]
+    ndcg_scores = [r["ndcg"] for r in rows_clean if r["i"] in DOCUMENT_QUERY_IDS]
 
     total_dt = time.monotonic() - t_start
     mrr_mean = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
     ndcg_mean = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
 
     print()
+    sql_rows = [r for r in rows_clean if r["i"] in SQL_QUERY_IDS]
+    hybrid_rows = [r for r in rows_clean if r["i"] in HYBRID_QUERY_IDS]
+    sql_route_accuracy = sum(r["tool"] == "text_to_sql" for r in sql_rows) / len(sql_rows)
+    hybrid_route_accuracy = sum(r["tool"] == "hybrid" for r in hybrid_rows) / len(hybrid_rows)
     print("=" * 56)
-    print(f"scored {len(golden)} questions ({len(mrr_scores)} with evidence_chunk_ids)")
+    print(f"scored {len(golden)} questions; document retrieval is cases 1-8 and 14-15")
     print(f"wall time: {total_dt:.0f}s")
     print(f"{'Metric':<20} | {'Score':>6}")
     print("-" * 32)
-    print(f"{'mrr':<20} | {mrr_mean:>6.2f}")
-    print(f"{'ndcg_at_10':<20} | {ndcg_mean:>6.2f}")
+    print(f"{'document_mrr':<20} | {mrr_mean:>6.2f}")
+    print(f"{'document_ndcg_at_10':<20} | {ndcg_mean:>6.2f}")
+    print(f"{'sql_route_accuracy':<20} | {sql_route_accuracy:>6.2f}")
+    print(f"{'hybrid_route_accuracy':<20} | {hybrid_route_accuracy:>6.2f}")
+    print("SQL result correctness is reported by scripts/evaluate_sql.py; hybrid remains separate.")
     print()
     print("(faithfulness / answer_relevancy / context_precision / context_recall")
     print(" not refreshed — judge deadlock; see .logs/eval_30q_gpu_timeout_*.log)")
@@ -135,10 +145,21 @@ async def main() -> int:
         json.dumps(
             {
                 "n_questions": len(golden),
-                "n_with_evidence": len(mrr_scores),
                 "wall_time_s": total_dt,
-                "mrr": mrr_mean,
-                "ndcg_at_10": ndcg_mean,
+                "document_retrieval": {
+                    "case_ids": sorted(DOCUMENT_QUERY_IDS),
+                    "case_count": len(mrr_scores),
+                    "mrr": mrr_mean,
+                    "ndcg_at_10": ndcg_mean,
+                },
+                "structured_sql": {
+                    "case_ids": sorted(SQL_QUERY_IDS),
+                    "route_accuracy": sql_route_accuracy,
+                },
+                "hybrid": {
+                    "case_ids": sorted(HYBRID_QUERY_IDS),
+                    "route_accuracy": hybrid_route_accuracy,
+                },
                 "rows": rows_clean,
             },
             indent=2,

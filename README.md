@@ -29,7 +29,7 @@ Key capabilities:
 ## Architecture
 
 ```
- FastAPI (/query, /ingest, /feedback, /health)
+ FastAPI (/query, /ingest, /feedback, /health, /ready)
               │
      ┌────────▼────────┐
      │  Intent Router  │  qwen3-30b (OpenRouter)
@@ -56,11 +56,26 @@ Key capabilities:
                      │
                Cited Response
 
-Sidecars:
-  Qdrant (vector + sparse index)  │ SQLite/Postgres (curated views)
+Dependencies:
+  Managed Qdrant (vector index)   │ SQLite demo DB (curated views)
   GPTCache (semantic cache, opt)  │ Langfuse (OTel traces)
   Prometheus + Grafana (metrics)  │
 ```
+
+### Supported v1 topology
+
+```text
+Client
+  ↓
+Fly.io FastAPI
+  ├── SQLite demo relational DB (baked into the application image)
+  ├── Managed Qdrant (versioned document and schema collections)
+  └── OpenRouter (routing, generation, contextualization, and faithfulness calls)
+```
+
+This is the only supported v1 deployment topology. SQLite is intentionally the relational
+database for the small portfolio demo. PostgreSQL portability, a self-hosted production Qdrant
+deployment, and full-stack Docker Compose reproducibility are not claimed for v1.
 
 ---
 
@@ -69,7 +84,7 @@ Sidecars:
 | Layer | Tool | Justification |
 |:------|:-----|:--------------|
 | Backend | FastAPI | Async, Pydantic v2 validation, Prometheus middleware, OpenAPI docs out of the box |
-| Vector DB | Qdrant (self-hosted) | Dense + sparse (BM25) hybrid search; payload filtering by doc_type/date/dept; HNSW tuning; production durability vs FAISS (in-memory only) |
+| Vector DB | Managed Qdrant | Durable versioned vector collections; runtime selection makes corpus rollback explicit |
 | Embedding | all-MiniLM-L6-v2 | 384-dim, 80MB, CPU batch ingestion; contextual retrieval + FlashRank compensate for first-pass quality |
 | Reranker | FlashRank Nano | 4MB CPU-only cross-encoder; sub-50ms; no Torch dependency; ~2pt nDCG loss vs ColBERT is acceptable |
 | Router LLM | qwen/qwen3-30b-a3b-instruct-2507 (OpenRouter) | Chosen by measurement: 23/23 on golden categories vs 21/23 for mistral-nemo |
@@ -99,12 +114,13 @@ Sidecars:
 
 ## Quick Start
 
-**Prerequisites:** Docker, Python 3.12+, an [OpenRouter](https://openrouter.ai) API key.
+**Prerequisites:** Python 3.12+, an [OpenRouter](https://openrouter.ai) API key, and a
+managed Qdrant cluster. Docker is optional for running Qdrant locally during development.
 
 No GPU required. No Ollama. All LLM calls go out over HTTP to OpenRouter.
 
 ```bash
-# 1. Start Qdrant
+# 1. Optional local-development Qdrant (use your managed URL for deployment)
 docker run -p 6333:6333 qdrant/qdrant
 
 # 2. Install Python dependencies
@@ -113,23 +129,30 @@ pip install -e '.[dev]'
 # 3. Set required environment variables (see below)
 cp .env.example .env   # then fill in OPENROUTER_API_KEY
 
-# 4. Seed the operational database and ingest the corpus
-python3 scripts/ingest_corpus.py
+# 4. Seed SQLite and bootstrap the versioned corpus
+python3 scripts/ingest_corpus.py --manifest corpus/v1.yaml
 
 # 5. Start the API
 uvicorn src.api.main:app --reload --port 8000
 ```
 
-Required environment variables — paste into `.env`:
+Required deployment environment variables:
 
 ```bash
-OPENROUTER_API_KEY=sk-or-...      # required: all LLM calls (routing, generation, faithfulness gate)
+OPENROUTER_API_KEY=<secret>                 # all OpenRouter calls
+QDRANT_URL=https://<cluster>.<provider>     # managed Qdrant endpoint
+QDRANT_API_KEY=<secret>                     # managed Qdrant credential
+QDRANT_COLLECTION=rag_operational_v1        # active document corpus
+QDRANT_SCHEMA_COLLECTION=rag_schema_meta_v1 # active schema metadata
+DB_URL=sqlite+aiosqlite:///./operational.db # supported v1 relational DB
 ```
+
+Store credentials with the platform secret manager (for example, Fly secrets), not in Git.
+`QDRANT_API_KEY` may be empty only for an unsecured local-development Qdrant instance.
 
 Optional variables (all have sensible defaults in `src/config.py`):
 
 ```bash
-QDRANT_URL=http://localhost:6333
 LOCAL_PROVIDER=openrouter          # or "ollama" for local dev with Ollama
 LOCAL_MODEL=mistralai/mistral-nemo
 ROUTER_MODEL=qwen/qwen3-30b-a3b-instruct-2507
@@ -141,6 +164,96 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 PII_ENTITIES=PERSON,EMAIL_ADDRESS,PHONE_NUMBER,CREDIT_CARD,IBAN_CODE,AU_TFN,AU_MEDICARE
 PII_ALLOW_LIST=Fairfield RSL,Fairfield_RSL,Fairfield,RSL
 ```
+
+## Corpus bootstrap and version lifecycle
+
+The corpus manifest is the human-readable deployment contract. `corpus/v1.yaml` pins the
+collection names, embedding model/dimension, contextualization model, chunking settings,
+document metadata, exact schema metadata, and SHA-256 checksums of every source file. Runtime
+settings still own endpoints, credentials, the SQLite URL, and which already-bootstrapped
+collections are active. This separation prevents a manifest from becoming a secret-bearing
+deployment configuration file.
+
+From a clean environment:
+
+```bash
+# Install the same project dependencies used by the API image.
+pip install -e '.[dev]'
+
+# Export the required variables listed above, then run:
+python3 scripts/ingest_corpus.py --manifest corpus/v1.yaml
+
+# Start the API with collection settings matching the manifest.
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+```
+
+The command validates the manifest and source checksums before writes, seeds the three SQLite
+tables and five views, creates missing Qdrant collections, indexes exactly the declared schema
+views and documents, and validates both non-empty collections, all expected document source IDs,
+and database connectivity. Its summary reports the corpus version, collection names, source
+document count, chunk/point counts, schema state, and relational rows processed. It never deletes
+an older collection. Bootstrap also requires the OpenRouter credential and fails before a document
+upsert if any declared contextual prefix cannot be generated; it does not certify a partial corpus.
+
+Document point IDs are UUIDv5 values derived from corpus version, source ID, page/chunk position,
+and normalized content hash. Schema IDs use corpus identity plus view name. Therefore retrying the
+same unchanged manifest upserts the same points instead of appending duplicates. Each point also
+stores the manifest digest; bootstrap refuses a non-empty target collection with a different
+version or digest. Contextual prefixes are LLM-generated and therefore are not claimed to be
+byte-for-byte reproducible, but retries remain structurally idempotent and cannot mix manifests.
+
+### Deploy a new corpus version
+
+1. Copy `corpus/v1.yaml` to `corpus/v2.yaml`.
+2. Set `corpus_version: v2`, use new names such as `rag_operational_v2` and
+   `rag_schema_meta_v2`, update the source list/checksums, and review ingestion settings.
+3. Run `python3 scripts/ingest_corpus.py --manifest corpus/v2.yaml`.
+4. Check the successful bootstrap summary before changing application configuration.
+5. Set `QDRANT_COLLECTION=rag_operational_v2` and
+   `QDRANT_SCHEMA_COLLECTION=rag_schema_meta_v2`, then restart/redeploy the API.
+
+Collection switching is deliberately configuration-based for v1. Do not reuse a v1 collection
+name for changed sources, and do not delete v1 during the v2 bootstrap.
+
+### Rollback
+
+Set `QDRANT_COLLECTION=rag_operational_v1` and
+`QDRANT_SCHEMA_COLLECTION=rag_schema_meta_v1`, then restart/redeploy the API. Because bootstrap
+does not delete prior collections, rollback requires no re-ingestion. The SQLite demo dataset is
+baked into the application image; roll back the image too if the relational fixture set changed.
+
+### Intentionally deferred
+
+- Full-stack Docker Compose reproducibility
+- CI deploy-artifact and post-deploy smoke tests
+- API authentication and ingestion authorization
+- Retry/circuit-breaker policy
+- Production relational database migration
+- Monitoring and alerting improvements
+
+## Runtime readiness
+
+`/ready` validates the active runtime configuration without changing it. It checks SQLite
+access and confirms that the collections named by `QDRANT_COLLECTION` and
+`QDRANT_SCHEMA_COLLECTION` both exist and contain at least one point. It does not call
+OpenRouter or any LLM, and it never creates, populates, or deletes Qdrant collections.
+
+Bootstrap provisions a manifest-defined corpus; `/ready` only verifies that the already
+provisioned corpus selected by the deployed environment is safe to serve.
+
+```bash
+# Ready deployment
+curl -i http://localhost:8000/ready
+# HTTP/1.1 200 OK
+# {"status":"ready","checks":{"database":{"status":"ok"},"document_collection":{"status":"ok","collection":"rag_operational_v1","points":42},"schema_collection":{"status":"ok","collection":"rag_schema_meta_v1","points":5}}}
+
+# A configured collection is absent, empty, or inaccessible
+curl -i http://localhost:8000/ready
+# HTTP/1.1 503 Service Unavailable
+# {"status":"not_ready","checks":{"database":{"status":"ok"},"document_collection":{"status":"collection_missing","collection":"rag_operational_v2"},"schema_collection":{"status":"ok","collection":"rag_schema_meta_v1","points":5}}}
+```
+
+`/health` is unchanged and remains the existing broad dependency probe.
 
 ---
 

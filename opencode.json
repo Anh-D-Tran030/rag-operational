@@ -1,5 +1,32 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      ".env.example": "allow",
+      "secrets/**": "deny",
+      "*.db": "deny",
+      "qdrant_storage/**": "deny"
+    },
+    "edit": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "secrets/**": "deny",
+      "*.db": "deny",
+      "qdrant_storage/**": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "git branch -D*": "deny",
+      "git rebase*": "deny",
+      "git commit --amend*": "deny",
+      "git filter-branch*": "deny"
+    }
+  },
   "provider": {
     "anthropic": {
       "type": "api",
@@ -13,14 +40,13 @@
     "deepseek": {
       "options": { "apiKey": "{env:DEEPSEEK_API_KEY}" }
     },
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "http://localhost:11434/v1" },
-      "models": {
-        "qwen3:4b-16k":          { "tools": true },
-        "qwen2.5-coder:7b-16k": { "tools": true }
+      "ollama": {
+        "npm": "@ai-sdk/openai-compatible",
+        "options": { "baseURL": "http://localhost:11434/v1" },
+        "models": {
+        "qwen2.5:7b": { "tools": true }
+        }
       }
-    }
   },
   "agent": {
     "plan": {
@@ -28,10 +54,10 @@
       "temperature": 0.0,
       "steps": 10,
       "permission": {
-        "edit": { "plan.md": "allow", "**": "deny" },
+        "edit": { "**": "deny", ".agent-context/runs/**/plan.md": "allow" },
         "bash": "deny"
       },
-      "description": "Read-only plan authoring. Writes plan.md then locks it."
+      "description": "Read-only plan authoring. Writes the active run plan.md then locks it."
     },
     "build": {
       "model": "deepseek/deepseek-v4-pro",
@@ -40,24 +66,31 @@
       "permission": {
         "edit": "allow",
         "bash": {
+          "*":           "ask",
           "pytest*":     "allow",
           "docker*":     "allow",
           "git diff*":   "allow",
           "git add*":    "allow",
           "git commit*": "allow",
           "pip*":        "ask",
-          "*":           "ask"
+          "git push*": "deny",
+          "git reset --hard*": "deny",
+          "git clean*": "deny",
+          "git branch -D*": "deny",
+          "git rebase*": "deny",
+          "git commit --amend*": "deny",
+          "git filter-branch*": "deny"
         }
       },
-      "description": "Reads plan.md and explore.md. Implements only files listed in plan.md. Reads trace.md for errors — never raw logs."
+      "description": "Reads the active run plan.md and explore.md. Implements only files listed in the locked plan. Reads run test.md for compressed failures."
     },
     "code-reviewer": {
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.1,
       "steps": 15,
       "permission": {
-        "edit": { "review.md": "allow", "**": "deny" },
-        "bash": { "git diff*": "allow", "*": "deny" }
+        "edit": { "**": "deny", ".agent-context/runs/**/review.md": "allow" },
+        "bash": { "*": "deny", "git diff*": "allow" }
       },
       "description": "Code quality, logic bugs, syntax checks. Outputs to review.md. SECURITY VIOLATION blocks git commit."
     },
@@ -66,8 +99,8 @@
       "temperature": 0.1,
       "steps": 20,
       "permission": {
-        "edit": { "tests/**": "allow", "**": "deny" },
-        "bash": { "pytest*": "allow", "*": "deny" }
+        "edit": { "**": "deny", "tests/**": "allow", ".agent-context/runs/**/test.md": "allow" },
+        "bash": { "*": "deny", "pytest*": "allow" }
       },
       "description": "Writes and runs pytest tests. Failure output piped to compressor before build reads it."
     },
@@ -76,13 +109,13 @@
       "temperature": 0.0,
       "steps": 15,
       "permission": {
-        "edit": { "explore.md": "allow", "**": "deny" },
+        "edit": { "**": "deny", ".agent-context/runs/**/explore.md": "allow" },
         "bash": {
+          "*":     "deny",
           "grep*": "allow",
           "find*": "allow",
           "cat*":  "allow",
-          "ls*":   "allow",
-          "*":     "deny"
+          "ls*":   "allow"
         }
       },
       "description": "Read-only grep and schema exploration. Outputs findings to explore.md."
@@ -92,17 +125,17 @@
       "temperature": 0.0,
       "steps": 5,
       "permission": {
-        "edit": { "trace.md": "allow", "**": "deny" },
+        "edit": { "**": "deny", ".agent-context/runs/**/test.md": "allow", ".agent-context/runs/**/handoff.md": "allow" },
         "bash": "deny"
       },
-      "description": "Compresses raw error output into trace.md. Always called before Build reads any error output."
+      "description": "Compresses raw failures into the active run test.md and refreshes concise handoff.md. It is a support role, not a gate."
     },
     "docs-writer": {
       "model": "deepseek/deepseek-v4-flash",
       "temperature": 0.3,
       "steps": 8,
       "permission": {
-        "edit": { "**/*.md": "allow", "**": "deny" },
+        "edit": { "**": "deny", "**/*.md": "allow" },
         "bash": "deny"
       },
       "description": "Updates status.md after each session. Logs blockers and discovered dependencies."

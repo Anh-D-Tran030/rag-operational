@@ -41,6 +41,14 @@ _SYSTEM = (
 _DEFAULT = {"tool": "hybrid", "complexity": "complex"}
 
 
+def _is_database_only_staffing_query(query: str) -> bool:
+    """Recognize staffing facts carried by curated SQL views, not documents."""
+    normalized = query.lower()
+    mentions_staffing = "staffing" in normalized or "staff count" in normalized
+    document_terms = ("procedure", "policy", "sop", "document", "licence", "license")
+    return mentions_staffing and not any(term in normalized for term in document_terms)
+
+
 async def classify_intent(query: str, config: LocalLLMConfig) -> dict:
     """Return routing decision for the query.
 
@@ -64,6 +72,8 @@ async def classify_intent(query: str, config: LocalLLMConfig) -> dict:
             tool = "hybrid"
         if complexity not in {"simple", "complex"}:
             complexity = "complex"
+        if _is_database_only_staffing_query(query):
+            return {"tool": "text_to_sql", "complexity": "simple"}
         return {"tool": tool, "complexity": complexity}
     except Exception as exc:
         logger.warning("classify_intent fell back to default: %s", exc)

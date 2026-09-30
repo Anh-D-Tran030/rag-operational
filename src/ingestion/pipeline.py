@@ -22,6 +22,11 @@ async def ingest_document(
     qdrant_client: AsyncQdrantClient,
     embedder: Embedder,
     settings: Settings,
+    corpus_version: str | None = None,
+    manifest_digest: str | None = None,
+    source_id: str | None = None,
+    embedding_dimension: int = _EMBEDDING_DIM,
+    require_contextual_prefix: bool = False,
 ) -> dict:
     """Run the full ingestion pipeline for a single document.
 
@@ -57,11 +62,30 @@ async def ingest_document(
         )
         chunk["contextual_prefix"] = prefix
 
+    if require_contextual_prefix and any(
+        not chunk["contextual_prefix"] for chunk in deduped
+    ):
+        raise RuntimeError("contextual prefix generation failed; document was not upserted")
+
     deduped = add_bm25_text(deduped)
     deduped = await embed_chunks(deduped, embedder)
 
-    await ensure_collection(qdrant_client, settings.qdrant_collection, _EMBEDDING_DIM)
-    count = await upsert_chunks(qdrant_client, settings.qdrant_collection, deduped, doc_metadata)
+    await ensure_collection(
+        qdrant_client,
+        settings.qdrant_collection,
+        embedding_dimension,
+        corpus_version=corpus_version,
+        manifest_digest=manifest_digest,
+    )
+    count = await upsert_chunks(
+        qdrant_client,
+        settings.qdrant_collection,
+        deduped,
+        doc_metadata,
+        corpus_version=corpus_version,
+        manifest_digest=manifest_digest,
+        source_id=source_id,
+    )
 
     return {
         "doc_type": doc_type,

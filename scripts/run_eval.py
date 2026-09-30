@@ -4,13 +4,15 @@ Requires QDRANT_URL, OLLAMA_URL and OPENROUTER_API_KEY. Both the pipeline under
 test and the RAGAS judge are routed through OpenRouter; answer_relevancy needs an
 embedder, which runs locally because OpenRouter serves chat only.
 
-Exits with code 1 if faithfulness < 0.8 (logs warning; hard gate is in CI).
+Exits 1 if a PLAN threshold (0.9/0.8/0.8/0.8) fails or a metric is missing/NaN.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.util
 import json
+import math
 import os
 import sys
 import tempfile
@@ -23,7 +25,25 @@ from src.generation.query_handler import handle_query
 from src.observability.tracer import RAGTracer
 from src.retrieval.cache import SemanticCache
 
+INSTALL_HINT = "install with `pip install -e .[eval]`"
+# ragas_runner/_build_judge import these lazily inside function bodies, so a
+# module-level try/except here would never see the missing extra (PLAN-003 §2.4).
+EVAL_MODULES = ("ragas", "langchain_community", "datasets")
+
+
+def _missing_eval_extra() -> list[str]:
+    return [m for m in EVAL_MODULES if importlib.util.find_spec(m) is None]
+
 GOLDEN_PATH = "eval_data/golden_dataset.json"
+# PLAN thresholds keyed by ragas' real score-dict names (it names its
+# precision metric llm_context_precision_with_reference, not context_precision).
+THRESHOLDS = {
+    "faithfulness": 0.9,
+    "answer_relevancy": 0.8,
+    "llm_context_precision_with_reference": 0.8,
+    "context_recall": 0.8,
+}
+METRIC_LABELS = {"llm_context_precision_with_reference": "context_precision"}
 
 
 def _build_handle_fn(
@@ -107,13 +127,14 @@ async def main() -> int:
         "--batch-size",
         type=int,
         default=10,
-        help=(
-            "Number of samples passed to RAGAS evaluate() per call. "
-            "Smaller values reduce peak RAM at the cost of more API round-trips. "
-            "Default: 10."
-        ),
+        help="Samples per RAGAS evaluate() call; smaller = less peak RAM. Default 10.",
     )
     args = parser.parse_args()
+
+    missing = _missing_eval_extra()
+    if missing:
+        print(f"missing eval packages {missing} ({INSTALL_HINT})", file=sys.stderr)
+        return 1
 
     settings = Settings(
         qdrant_url=os.environ.get("QDRANT_URL", "http://localhost:6333"),
@@ -145,27 +166,33 @@ async def main() -> int:
         batch_size=args.batch_size,
     )
 
-    header = f"{'Metric':<20} | {'Score':>6}"
+    header = f"{'Metric':<20} | {'Score':>6} | {'n':>4}"
     print(header)
     print("-" * len(header))
-    for metric in (
-        "faithfulness",
-        "answer_relevancy",
-        "context_precision",
-        "context_recall",
-        "mrr",
-        "ndcg_at_10",
-    ):
-        print(f"{metric:<20} | {scores.get(metric, 0.0):>6.2f}")
+    retrieval_n = scores.get("retrieval_cases", 0)
+    denominators = {"mrr": retrieval_n, "ndcg_at_10": retrieval_n}
+    # PLAN-003 §2.4/§8: a missing score, a NaN, or a zero denominator is a
+    # failed acceptance check, not a silently averaged-away row.
+    failures = []
+    for key in (*THRESHOLDS, "mrr", "ndcg_at_10"):
+        label = METRIC_LABELS.get(key, key)
+        value = scores.get(key)
+        n = scores.get(f"{key}_n", denominators.get(key, 0))
+        print(f"{label:<20} | {value if value is not None else float('nan'):>6.2f} | {n:>4.0f}")
+        threshold = THRESHOLDS.get(key)
+        if threshold is None:
+            continue
+        if value is None or math.isnan(value) or n <= 0:
+            failures.append(f"{label}: missing/NaN score or zero denominator (n={n})")
+        elif value < threshold:
+            failures.append(f"{label}: {value:.2f} < {threshold} threshold")
     print(
         f"\nscored {scores.get('generation_cases', 0):.0f} questions "
-        f"({scores.get('retrieval_cases', 0):.0f} with evidence ids)"
+        f"({retrieval_n:.0f} with evidence ids)"
     )
-
-    if scores.get("faithfulness", 0.0) < 0.8:
-        print("\nWARNING: faithfulness below 0.8 soft threshold", file=sys.stderr)
-        return 1
-    return 0
+    for line in failures:
+        print(f"FAIL: {line}", file=sys.stderr)
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

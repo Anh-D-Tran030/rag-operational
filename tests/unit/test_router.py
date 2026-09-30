@@ -42,6 +42,36 @@ async def test_classify_text_to_sql(httpx_mock):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Did floor staffing at Fairfield RSL meet the required count on the night of 2026-05-28?",
+        "On which May 2026 shifts did Fairfield RSL fall short of its required floor-staff count?",
+        "Did Fairfield RSL meet its security staffing requirement on 2026-05-25?",
+    ],
+)
+async def test_database_only_staffing_queries_override_hybrid_to_sql(query):
+    with patch(
+        "src.generation.router.complete",
+        AsyncMock(return_value='{"tool": "hybrid", "complexity": "complex"}'),
+    ):
+        result = await classify_intent(query, _OLLAMA)
+    assert result == {"tool": "text_to_sql", "complexity": "simple"}
+
+
+@pytest.mark.asyncio
+async def test_document_backed_staffing_question_remains_hybrid():
+    with patch(
+        "src.generation.router.complete",
+        AsyncMock(return_value='{"tool": "hybrid", "complexity": "complex"}'),
+    ):
+        result = await classify_intent(
+            "Did staffing on 12 March meet the minimum the procedure requires?", _OLLAMA
+        )
+    assert result == {"tool": "hybrid", "complexity": "complex"}
+
+
+@pytest.mark.asyncio
 async def test_classify_hybrid(httpx_mock):
     httpx_mock.add_response(
         method="POST",

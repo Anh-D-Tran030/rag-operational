@@ -14,8 +14,9 @@ RAGAS 0.4 API notes:
 - Embeddings for answer_relevancy use LangchainEmbeddingsWrapper so that
   embed_query() is available (the native RAGAS HuggingFaceEmbeddings only has
   embed_text(); LangchainEmbeddingsWrapper bridges the two APIs).
-- evaluate() now accepts EvaluationDataset of SingleTurnSample objects; result.scores
-  is a list[dict] (one per row).
+- evaluate() accepts EvaluationDataset of SingleTurnSample objects; result.scores
+  is a list[dict] (one per row); its keys are ragas' real metric names, e.g.
+  `llm_context_precision_with_reference`, not `context_precision`.
 """
 from __future__ import annotations
 
@@ -79,15 +80,14 @@ async def run_ragas_eval(
       handle_query_fn: async callable that takes a question and returns the
         `handle_query` response dict (`answer`, `citations`, ...).
       wandb_run: optional `wandb.Run` to receive `wandb.log({...})` aggregates.
-      judge_llm: RAGAS InstructorLLM from llm_factory(). Must be passed explicitly
-        when routing through OpenRouter (the default OpenAI backend won't have the
-        right base_url).
+      judge_llm: RAGAS InstructorLLM from llm_factory(); required for OpenRouter
+        routing (the default OpenAI backend has the wrong base_url).
       judge_embeddings: LangchainEmbeddingsWrapper around a local HuggingFace model.
         Required for answer_relevancy; must expose embed_query().
 
     Returns:
-      `{faithfulness, answer_relevancy, context_precision, context_recall,
-        mrr, ndcg_at_10}` — each value the mean across the dataset.
+      mean per ragas metric (real key names, e.g. `llm_context_precision_with_reference`)
+      plus `mrr`/`ndcg_at_10`, each with a matching `<key>_n` denominator.
     """
     import warnings
 
@@ -167,7 +167,11 @@ async def run_ragas_eval(
         for k, v in row_scores.items():
             if v is not None and not (isinstance(v, float) and math.isnan(v)):
                 agg.setdefault(k, []).append(float(v))
-    scores = {k: sum(vs) / len(vs) for k, vs in agg.items() if vs}
+    # PLAN-003 §2.4/§8: `<k>_n` denominators distinguish a real 0.0 from all-NaN.
+    scores: dict[str, float] = {}
+    for k, vs in agg.items():
+        scores[k] = sum(vs) / len(vs)
+        scores[f"{k}_n"] = float(len(vs))
     scores["mrr"] = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
     scores["ndcg_at_10"] = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
     scores["retrieval_cases"] = float(len(mrr_scores))

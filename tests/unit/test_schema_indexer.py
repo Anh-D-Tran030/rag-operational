@@ -200,6 +200,15 @@ async def test_index_schema_metadata_payload_view_names_match_descriptions():
     assert actual_view_names == expected_view_names
 
 
+def test_new_schema_descriptions_preserve_evidence_limits() -> None:
+    views = {view["view_name"]: view for view in _SCHEMA_DESCRIPTIONS}
+    assert "supervisor" in views["v_shift_details"]["columns"]
+    assert views["v_incident_by_shift"]["columns"] == [
+        "shift_id", "venue", "date", "incident_count",
+    ]
+    assert "absence of a row is not evidence" in views["v_shift_staffing_evidence"]["description"]
+
+
 @pytest.mark.asyncio
 async def test_index_schema_metadata_columns_is_list():
     """Each payload 'columns' entry must be a list."""
@@ -284,9 +293,9 @@ async def test_index_schema_metadata_calls_upsert():
 # Test: _SCHEMA_DESCRIPTIONS constant integrity
 # ---------------------------------------------------------------------------
 
-def test_schema_descriptions_constant_has_five_views():
-    """There must be exactly 5 view descriptions (one per curated SQL view from M1-15)."""
-    assert len(_SCHEMA_DESCRIPTIONS) == 5
+def test_schema_descriptions_constant_has_all_curated_views():
+    """Schema metadata must cover every curated SQL view."""
+    assert len(_SCHEMA_DESCRIPTIONS) == 8
 
 
 def test_schema_descriptions_all_have_required_keys():
@@ -294,3 +303,24 @@ def test_schema_descriptions_all_have_required_keys():
     for entry in _SCHEMA_DESCRIPTIONS:
         for field in REQUIRED_PAYLOAD_FIELDS:
             assert field in entry, f"_SCHEMA_DESCRIPTIONS entry missing key: {field}"
+
+
+@pytest.mark.asyncio
+async def test_manifest_schema_ids_are_stable():
+    captured: list[list] = []
+
+    async def capture_upsert(collection_name, points):
+        captured.append(points)
+
+    client = _make_mock_client(collection_exists=False)
+    client.upsert = capture_upsert
+    views = [_SCHEMA_DESCRIPTIONS[0]]
+    for _ in range(2):
+        await index_schema_metadata(
+            client, "rag_schema_meta_v1", _make_mock_embedder(), "unused",
+            schema_views=views, corpus_version="v1", manifest_digest="digest",
+            embedding_dimension=384,
+        )
+
+    assert captured[0][0].id == captured[1][0].id
+    assert captured[0][0].payload["corpus_version"] == "v1"

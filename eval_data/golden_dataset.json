@@ -26,7 +26,7 @@
   {
     "question": "What is the fine range for minor licence violations under the compliance document?",
     "ground_truth": "Between $5,500 and $11,000.",
-    "evidence_chunk_ids": ["compliance_pdf:section_4"],
+    "evidence_chunk_ids": ["compliance_pdf:chunk_3"],
     "category": "simple_lookup"
   },
   {
@@ -44,7 +44,7 @@
   {
     "question": "How frequently is RSA refresher training required at Fairfield RSL?",
     "ground_truth": "Quarterly.",
-    "evidence_chunk_ids": ["compliance_pdf:section_2"],
+    "evidence_chunk_ids": ["compliance_pdf:chunk_1"],
     "category": "simple_lookup"
   },
   {

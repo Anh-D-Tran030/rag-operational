@@ -124,3 +124,26 @@ async def test_empty_scroll_still_returns_dense(mock_client):
         top_k=3,
     )
     assert isinstance(result, list)
+
+
+@pytest.mark.asyncio
+async def test_bm25_scrolls_all_pages(mock_client):
+    """A relevant lexical hit on a later scroll page must be eligible for RRF."""
+    first = _make_hit("1", 0.0, _make_payload("unrelated", "hash1", "unrelated"))
+    relevant = _make_hit(
+        "2", 0.0, _make_payload("fire assembly point", "hash2", "fire assembly point")
+    )
+    mock_client.query_points = AsyncMock(return_value=_query_response([]))
+    mock_client.scroll = AsyncMock(side_effect=[([first], "next-page"), ([relevant], None)])
+
+    result = await hybrid_search(
+        query="fire assembly point",
+        query_embedding=[0.1] * 384,
+        client=mock_client,
+        collection="docs",
+        top_k=2,
+    )
+
+    assert {item["content_hash"] for item in result} == {"hash1", "hash2"}
+    assert mock_client.scroll.await_count == 2
+    assert mock_client.scroll.await_args_list[1].kwargs["offset"] == "next-page"
