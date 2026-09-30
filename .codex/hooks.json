@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".agent-context/hooks/precompact_archive.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "CHECKPOINT_REASON=context_pressure .agent-context/hooks/checkpoint.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".agent-context/hooks/inject_pinned_context.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CHECKPOINT_REASON=session_end .agent-context/hooks/checkpoint.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": ".agent-context/hooks/sync_status_md.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".agent-context/hooks/log_episodic.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".agent-context/hooks/critic_gate.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "hybrid-22-rsa-interventions",
+    "status": "ready",
+    "source_case": 22,
+    "question_source": "eval_data/golden_dataset.json#22",
+    "evaluation_contract": "Use the existing case-22 document anchors and SQL expectation; report its components separately from aggregate SQL metrics."
+  },
+  {
+    "id": "hybrid-conflicting-document-versions",
+    "status": "blocked_human_decision",
+    "scenario": "Ingest two versioned procedure documents that give different RSA escalation instructions for the same venue and effective period.",
+    "question": "What is the RSA escalation procedure for floor staff at Fairfield RSL?",
+    "required_decision": "Specify the authoritative-version rule (effective date, explicit supersession marker, or source priority) and the expected citation behavior when both versions remain retrievable."
+  },
+  {
+    "id": "hybrid-missing-shift-record",
+    "status": "blocked_human_decision",
+    "scenario": "A document names an incident but its referenced shift record is absent from the curated database.",
+    "question": "Did staffing meet the requirement on the shift with the documented incident?",
+    "required_decision": "Decide whether missing relational evidence requires abstention, a document-only answer with an explicit limitation, or a data-quality error response."
+  },
+  {
+    "id": "hybrid-wrong-but-runnable-sql",
+    "status": "ready",
+    "source_case": 19,
+    "question_source": "eval_data/golden_dataset.json#19",
+    "evaluation_contract": "Compare executed rows against eval_data/sql_expected_results.json#19. A query that executes but returns a different shift or incident count is a wrong-but-runnable failure."
+  },
+  {
+    "id": "hybrid-near-answerable-unsupported",
+    "status": "blocked_human_decision",
+    "scenario": "Pair the supported roster-count question from case 9 with supervisor lookup case 10, whose curated schema does not expose supervisor.",
+    "question_source": "eval_data/golden_dataset.json#10",
+    "required_decision": "Specify whether an unsupported curated-schema question should route to document retrieval, abstain, or return a structured schema-coverage limitation."
+  }
+]

@@ -1,0 +1,13 @@
+[mcp_servers.context7]
+command = "npx"
+args = [
+    "-y",
+    "@upstash/context7-mcp@latest",
+]
+
+[mcp_servers.duckduckgo-search]
+command = "npx"
+args = [
+    "-y",
+    "duckduckgo-mcp-server",
+]
