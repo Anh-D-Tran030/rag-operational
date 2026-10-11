@@ -1,0 +1,161 @@
+[
+  {
+    "query_id": 9,
+    "expected_view": ["v_peak_staffing"],
+    "expected_columns": ["staff_count"],
+    "column_aliases": {"staff_count": ["staff_count", "total_staff", "rostered_staff", "staff_rostered"]},
+    "expected_rows": [{"staff_count": 15}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 10,
+    "expected_view": ["v_shift_details"],
+    "expected_columns": ["supervisor"],
+    "column_aliases": {"supervisor": ["supervisor"]},
+    "expected_rows": [{"supervisor": "J. Thompson"}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"],
+    "note": "v_shift_details exposes supervisor for each shift."
+  },
+  {
+    "query_id": 11,
+    "expected_view": ["v_incident_by_shift"],
+    "expected_columns": ["incident_count"],
+    "column_aliases": {"incident_count": ["incident_count", "count", "total_incidents"]},
+    "expected_rows": [{"incident_count": 2}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"],
+    "note": "v_incident_by_shift counts all logged incidents keyed by shift_id."
+  },
+  {
+    "query_id": 12,
+    "expected_view": ["v_peak_staffing"],
+    "expected_columns": ["staff_count"],
+    "column_aliases": {"staff_count": ["staff_count", "total_staff"]},
+    "expected_rows": [{"staff_count": 17}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 13,
+    "expected_view": ["v_incident_severity"],
+    "expected_columns": ["severity"],
+    "column_aliases": {"severity": ["severity"]},
+    "expected_rows": [{"severity": "high"}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 16,
+    "expected_view": ["v_staffing_gap"],
+    "expected_columns": ["floor_staff_count", "required_count", "met_requirement"],
+    "column_aliases": {
+      "floor_staff_count": ["floor_staff_count", "count", "actual_count", "staffed_count"],
+      "required_count": ["required_count"],
+      "met_requirement": ["met_requirement", "requirement_met", "met", "met_required"]
+    },
+    "expected_rows": [{"floor_staff_count": 8, "required_count": 8, "met_requirement": true}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 17,
+    "expected_view": ["v_staffing_gap"],
+    "expected_columns": ["date", "floor_staff_count", "required_count"],
+    "column_aliases": {
+      "date": ["date"],
+      "floor_staff_count": ["floor_staff_count", "count", "actual_count"],
+      "required_count": ["required_count"]
+    },
+    "expected_rows": [
+      {"date": "2026-05-27", "floor_staff_count": 6, "required_count": 8},
+      {"date": "2026-05-25", "floor_staff_count": 5, "required_count": 8},
+      {"date": "2026-05-22", "floor_staff_count": 4, "required_count": 8}
+    ],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 18,
+    "expected_view": ["v_incident_severity", "v_staffing_gap"],
+    "expected_columns": ["linked_to_understaffing"],
+    "column_aliases": {
+      "linked_to_understaffing": ["linked_to_understaffing", "understaffed", "was_understaffed"]
+    },
+    "expected_rows": [{"linked_to_understaffing": false}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "partial",
+    "acceptable_routes": ["text_to_sql", "hybrid"],
+    "note": "The fixture has no staffing row for 2026-05-19, so one high-severity incident cannot be joined to staffing evidence."
+  },
+  {
+    "query_id": 19,
+    "expected_view": ["v_peak_staffing", "v_incident_by_venue"],
+    "expected_columns": ["shift_id", "staff_count", "incident_count"],
+    "column_aliases": {
+      "shift_id": ["shift_id"],
+      "staff_count": ["staff_count", "total_staff"],
+      "incident_count": ["incident_count", "count", "total_incidents", "incidents"]
+    },
+    "expected_rows": [{"shift_id": "SH-006", "staff_count": 20, "incident_count": 2}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql", "hybrid"],
+    "note": "SUM(incident_count) over v_incident_by_venue joined per shift, or v_incident_by_shift directly, are equally valid; an unsummed per-type join undercounts."
+  },
+  {
+    "query_id": 20,
+    "expected_view": ["v_incident_severity", "v_shift_details"],
+    "expected_columns": ["medical_event_supervisor", "sh001_supervisor", "same_supervisor"],
+    "column_aliases": {
+      "medical_event_supervisor": ["medical_event_supervisor", "incident_supervisor"],
+      "sh001_supervisor": ["sh001_supervisor", "comparison_supervisor"],
+      "same_supervisor": ["same_supervisor", "is_same_supervisor", "same"]
+    },
+    "expected_rows": [{"medical_event_supervisor": "S. Lee", "sh001_supervisor": "J. Thompson", "same_supervisor": false}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql", "hybrid"],
+    "note": "v_incident_severity can join v_shift_details by shift_id for supervisor evidence. The deterministic SQL also returns incident_id, incident_type, incident_shift_id and comparison_shift_id so the answer can cite INC-007/SH-010."
+  },
+  {
+    "query_id": 21,
+    "expected_view": ["v_staffing_gap"],
+    "expected_columns": ["security_count", "required_count", "met_requirement"],
+    "column_aliases": {
+      "security_count": ["security_count", "count", "actual_count"],
+      "required_count": ["required_count"],
+      "met_requirement": ["met_requirement", "met_security_requirement", "requirement_met", "met", "status"]
+    },
+    "expected_rows": [{"security_count": 2, "required_count": 3, "met_requirement": false}],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "full",
+    "acceptable_routes": ["text_to_sql"]
+  },
+  {
+    "query_id": 23,
+    "expected_view": ["v_incident_by_venue"],
+    "expected_columns": ["date", "rsa_intervention_count"],
+    "column_aliases": {
+      "date": ["date"],
+      "rsa_intervention_count": ["rsa_intervention_count", "incident_count", "count"]
+    },
+    "expected_rows": [
+      {"date": "2026-05-28", "rsa_intervention_count": 1},
+      {"date": "2026-05-24", "rsa_intervention_count": 1},
+      {"date": "2026-05-10", "rsa_intervention_count": 1}
+    ],
+    "acceptable_aggregation": "exact_rows_order_insensitive",
+    "schema_support": "unsupported",
+    "acceptable_routes": ["text_to_sql", "hybrid"],
+    "note": "The curated incident aggregate lacks shift type and a rate denominator; its incident counts are supporting facts, not a valid intervention-rate result."
+  }
+]
