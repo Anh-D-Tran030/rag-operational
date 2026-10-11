@@ -24,7 +24,7 @@ RUN apt-get update \
 # sentence-transformers pulling the GPU build in as a transitive dependency.
 RUN pip install --index-url https://download.pytorch.org/whl/cpu torch
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml ./
 COPY src ./src
 RUN pip install .
 
@@ -65,16 +65,16 @@ ENV TRANSFORMERS_OFFLINE=1 \
     HF_HUB_OFFLINE=1
 
 COPY src ./src
-COPY tests/fixtures ./tests/fixtures
 COPY scripts ./scripts
-COPY eval_data ./eval_data
+COPY corpus ./corpus
+COPY data ./data
 
 # Seed the read-only operational database at build time so the runtime filesystem
 # can stay immutable and no volume is required.
 RUN python -c "\
 import asyncio; \
 from src.ingestion.structured_loader import seed_database; \
-asyncio.run(seed_database('sqlite+aiosqlite:///./operational.db', 'tests/fixtures'))"
+asyncio.run(seed_database('sqlite+aiosqlite:///./operational.db', 'data/fixtures'))"
 
 RUN useradd --create-home --uid 10001 appuser \
     && chown -R appuser:appuser /app /opt/models

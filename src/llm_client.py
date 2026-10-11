@@ -8,6 +8,7 @@ gate and ingest-time context generation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import openai
@@ -27,6 +28,19 @@ class LocalLLMConfig:
     ollama_url: str = ""
     api_key: str = ""
     base_url: str = ""
+
+
+@dataclass(frozen=True)
+class ChatCompletionResult:
+    """Text plus provider evidence from one chat completion."""
+
+    text: str
+    response_id: str | None
+    finish_reason: str | None
+    usage: dict[str, int | None]
+    model: str | None
+    provider: str | None
+    configured_output_token_limit: int
 
 
 async def complete(
@@ -70,7 +84,9 @@ async def chat(
     max_tokens: int,
     system: str | None = None,
     temperature: float | None = None,
-) -> str:
+    response_format: dict[str, Any] | None = None,
+    return_metadata: bool = False,
+) -> str | ChatCompletionResult:
     """Send a single-turn prompt and return the assistant text (never None).
 
     `temperature` is only sent when set, so the provider default stands for
@@ -83,11 +99,30 @@ async def chat(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    extra = {} if temperature is None else {"temperature": temperature}
+    extra: dict[str, Any] = {}
+    if temperature is not None:
+        extra["temperature"] = temperature
+    if response_format is not None:
+        extra["response_format"] = response_format
     response = await client.chat.completions.create(
         model=model,
         max_tokens=max_tokens,
         messages=messages,
         **extra,
     )
-    return response.choices[0].message.content or ""
+    choice = response.choices[0]
+    usage = getattr(response, "usage", None)
+    result = ChatCompletionResult(
+        text=choice.message.content or "",
+        response_id=getattr(response, "id", None),
+        finish_reason=getattr(choice, "finish_reason", None),
+        usage={
+            "prompt_tokens": getattr(usage, "prompt_tokens", None),
+            "completion_tokens": getattr(usage, "completion_tokens", None),
+            "total_tokens": getattr(usage, "total_tokens", None),
+        },
+        model=getattr(response, "model", None),
+        provider=getattr(response, "provider", None),
+        configured_output_token_limit=max_tokens,
+    )
+    return result if return_metadata else result.text

@@ -1,9 +1,14 @@
 """Hybrid BM25 + dense vector search with Reciprocal Rank Fusion."""
+
 from __future__ import annotations
+
+from typing import Any
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Filter, ScoredPoint
 from rank_bm25 import BM25Okapi
+
+_BM25_SCROLL_PAGE_SIZE = 256
 
 
 def _rrf_merge(
@@ -50,6 +55,34 @@ def _hit_to_dict(hit: ScoredPoint) -> dict:
     }
 
 
+async def _scroll_all_bm25_points(
+    client: AsyncQdrantClient,
+    collection: str,
+    qdrant_filter: Filter | None,
+) -> list[Any]:
+    """Return every filtered point needed for local BM25 ranking.
+
+    Qdrant's scroll endpoint is paginated.  Ranking only its first page makes
+    lexical recall dependent on point-id order once a collection grows past the
+    request limit, so keep following the returned offset until exhaustion.
+    """
+    points: list[Any] = []
+    offset = None
+    while True:
+        page, next_offset = await client.scroll(
+            collection_name=collection,
+            scroll_filter=qdrant_filter,
+            limit=_BM25_SCROLL_PAGE_SIZE,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points.extend(page)
+        if next_offset is None:
+            return points
+        offset = next_offset
+
+
 async def hybrid_search(
     query: str,
     query_embedding: list[float],
@@ -79,15 +112,9 @@ async def hybrid_search(
     )
     dense_results = dense_response.points
 
-    # BM25 search: fetch payload texts then re-rank locally
-    scroll_result = await client.scroll(
-        collection_name=collection,
-        scroll_filter=qdrant_filter,
-        limit=fetch_k,
-        with_payload=True,
-        with_vectors=False,
-    )
-    points, _ = scroll_result
+    # BM25 search: fetch every filtered payload then re-rank locally.  Unlike
+    # dense search, local BM25 has no Qdrant-side candidate limit to apply.
+    points = await _scroll_all_bm25_points(client, collection, qdrant_filter)
 
     if points:
         corpus = [p.payload.get("bm25_text", "") if p.payload else "" for p in points]

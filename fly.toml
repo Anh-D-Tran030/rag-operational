@@ -24,7 +24,7 @@ primary_region = "syd"
   grace_period = "45s"
   interval = "30s"
   method = "GET"
-  path = "/health"
+  path = "/ready"
   protocol = "http"
   timeout = "5s"
 

@@ -1,0 +1,36 @@
+RAG OPERATIONAL — DEMO NOTES
+
+Purpose
+  Hybrid document retrieval and text-to-SQL for venue operational records,
+  with PII redaction, schema-aware SQL generation, and a faithfulness gate.
+
+Local setup
+  1. Create a Python 3.12 virtual environment.
+  2. Install the API: pip install -e .
+  3. Copy .env.example to .env and provide OPENROUTER_API_KEY.
+  4. Start Qdrant: docker compose -f infra/docker-compose.yml up -d qdrant
+  5. Load demo data:
+       python3 scripts/ingest_corpus.py --manifest corpus/v1.yaml
+  6. Start the API:
+       uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+
+Optional UI
+  Install with: pip install -e '.[ui]'
+  Run with:    streamlit run app/streamlit_app.py
+
+Container
+  docker build -t rag-operational .
+  The image seeds operational.db from data/fixtures. Qdrant document ingestion
+  remains a separate bootstrap step using scripts/ingest_corpus.py.
+
+Last verification before demo cleanup
+  Canonical sensor: 996 passed.
+  Full suite: 1130 passed, 32 skipped, 0 failed.
+  Live TEST008 was structurally valid but did not meet acceptance: required
+  cases 13, 14 and 19 failed, and case 16 failed outside the frozen allowance.
+  Case 20 and case 15 passed. Do not present the live evaluation as accepted.
+
+Repository cleanup
+  The demo branch intentionally excludes agent workflow state, test/evaluation
+  harnesses, historical logs, and development-only diagnostics. A pre-cleanup
+  workspace archive was created locally before removal.

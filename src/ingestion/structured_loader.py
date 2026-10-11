@@ -13,6 +13,23 @@ async def seed_database(db_url: str, csv_dir: str) -> dict:
 
     Tables created: shift_records, incident_logs, staffing_history.
     """
+    sources = [
+        {"table": table, "path": os.path.join(csv_dir, filename)}
+        for table, filename in [
+            ("shift_records", "shift_records.csv"),
+            ("incident_logs", "incident_logs.csv"),
+            ("staffing_history", "staffing_history.csv"),
+        ]
+    ]
+    return await seed_database_sources(db_url, sources)
+
+
+async def seed_database_sources(db_url: str, sources: list[dict[str, str]]) -> dict:
+    """Seed the known SQLite demo tables from explicit manifest sources."""
+    supported = {"shift_records", "incident_logs", "staffing_history"}
+    if any(source.get("table") not in supported for source in sources):
+        raise ValueError("structured source names an unsupported table")
+
     engine = create_async_engine(db_url, echo=False)
     async with engine.begin() as conn:
         await conn.execute(text("""
@@ -35,12 +52,9 @@ async def seed_database(db_url: str, csv_dir: str) -> dict:
         """))
 
     counts: dict[str, int] = {}
-    for table, filename in [
-        ("shift_records", "shift_records.csv"),
-        ("incident_logs", "incident_logs.csv"),
-        ("staffing_history", "staffing_history.csv"),
-    ]:
-        path = os.path.join(csv_dir, filename)
+    for source in sources:
+        table = source["table"]
+        path = source["path"]
         rows = _read_csv(path)
         if rows:
             async with engine.begin() as conn:
@@ -66,7 +80,7 @@ def _read_csv(path: str) -> list[dict]:
 
 
 async def create_views(engine: AsyncEngine) -> None:
-    """Create 5 curated SQL views for safe, predictable SQL generation."""
+    """Create curated SQL views for safe, predictable SQL generation."""
     async with engine.begin() as conn:
         await conn.execute(text("""
             CREATE VIEW IF NOT EXISTS v_shift_summary AS
@@ -99,4 +113,21 @@ async def create_views(engine: AsyncEngine) -> None:
                 FROM shift_records GROUP BY venue
             ) avg_s ON s.venue = avg_s.venue
             WHERE s.staff_count > avg_s.avg_staff
+        """))
+        await conn.execute(text("""
+            CREATE VIEW IF NOT EXISTS v_shift_details AS
+            SELECT shift_id, venue, date, staff_count, shift_type, supervisor
+            FROM shift_records
+        """))
+        await conn.execute(text("""
+            CREATE VIEW IF NOT EXISTS v_incident_by_shift AS
+            SELECT shift_id, venue, date, COUNT(*) AS incident_count
+            FROM incident_logs GROUP BY shift_id, venue, date
+        """))
+        await conn.execute(text("""
+            CREATE VIEW IF NOT EXISTS v_shift_staffing_evidence AS
+            SELECT s.shift_id, s.venue, s.date, h.role, h.count, h.required_count,
+                   h.count - h.required_count AS gap
+            FROM shift_records AS s
+            JOIN staffing_history AS h ON h.venue = s.venue AND h.date = s.date
         """))

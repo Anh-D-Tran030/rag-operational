@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
+from collections.abc import Sequence
 from typing import Any
 
 from src.observability.metrics import rag_pii_redactions
@@ -60,12 +62,18 @@ _ALLOW_LIST = tuple(
 )
 
 
-def redact_pii(text: str, label: str = "input") -> str:
+def redact_pii(text: str, label: str = "input", evidence: Sequence[str] = ()) -> str:
     """Redact PII from text using Presidio NER + regex for staff IDs.
 
     Args:
         text: Input string to redact.
         label: "input" or "output" — used as the Prometheus label.
+        evidence: Queried SQL row values and retrieved chunk text. A detected
+            entity whose exact span occurs verbatim in any of them was copied from
+            the evidence, not generated, so it is answer content and is kept. NER
+            is not consistent enough to decide this by itself: it masked one
+            supervisor name and kept another in the same sentence. Staff IDs are
+            always redacted.
 
     Returns:
         String with detected PII replaced by <REDACTED_ENTITY_TYPE> tokens.
@@ -87,8 +95,26 @@ def redact_pii(text: str, label: str = "input") -> str:
         entities=list(_ENTITIES),
         allow_list=list(_ALLOW_LIST),
     )
+    if evidence:
+        normalized = [_typographic(item) for item in evidence]
+        results = [r for r in results if not _in_evidence(text[r.start:r.end], normalized)]
     if results:
         anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
         rag_pii_redactions.labels(label=label).inc(len(results))
         return anonymized.text
     return text
+
+
+def _typographic(text: str) -> str:
+    """Fold rendering-only differences: generators write "S. Lee" for "S. Lee"."""
+    return "".join(
+        " " if unicodedata.category(ch) == "Zs" else "-" if unicodedata.category(ch) == "Pd"
+        else ch
+        for ch in unicodedata.normalize("NFKC", text)
+    )
+
+
+def _in_evidence(span: str, normalized_evidence: Sequence[str]) -> bool:
+    """Return whether a detected span was copied from the (normalized) evidence."""
+    span = _typographic(span)
+    return bool(span) and any(span in item for item in normalized_evidence)

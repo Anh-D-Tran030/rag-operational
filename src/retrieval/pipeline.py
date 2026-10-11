@@ -108,10 +108,15 @@ async def vector_search_pipeline(
     chunks: list[dict] = []
     tokens_used = 0
     iterations = 0
+    retrieval_ms = 0.0
+    reranking_ms = 0.0
 
     for iteration in range(max(1, settings.max_retrieval_iterations)):
         iterations = iteration + 1
+        retrieval_started = time.monotonic()
         candidates = await _expand_and_search(current_query, client, settings, filters)
+        retrieval_ms += (time.monotonic() - retrieval_started) * 1000
+        reranking_started = time.monotonic()
         chunks = await rerank(
             query=current_query,
             chunks=candidates,
@@ -119,6 +124,7 @@ async def vector_search_pipeline(
             score_threshold=settings.rerank_score_threshold,
             trace_id=trace_id,
         )
+        reranking_ms += (time.monotonic() - reranking_started) * 1000
 
         if complexity != "complex" or not chunks:
             break
@@ -160,4 +166,6 @@ async def vector_search_pipeline(
         "iterations": iterations,
         "tokens_used": tokens_used,
         "final_query": current_query,
+        "retrieval_ms": round(retrieval_ms, 2),
+        "reranking_ms": round(reranking_ms, 2),
     }

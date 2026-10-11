@@ -1,26 +1,61 @@
-"""Text-to-SQL: generate, validate, execute SQL against curated views."""
+"""Text-to-SQL: generate, validate, execute SQL against curated views.
+
+Compatibility facade over the ``sql_*`` modules. Public names, private helpers
+used by tests and every module-level patch point (``chat``, the timeouts,
+``SQL_FALLBACK_MODEL``, ``generate_sql``/``validate_sql``/``execute_sql`` and
+the metric objects) live here. The wrappers pass this module to the
+implementations, which read those attributes at call time, so a patch on
+``src.retrieval.text_to_sql`` still controls the real call.
+"""
 from __future__ import annotations
 
-import re
-
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+import sys
 
 from src.config import Settings
-from src.llm_client import chat
-from src.observability.metrics import rag_sql_execution_errors
-
-_DML_PATTERN = re.compile(
-    r"^\s*(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|MERGE)\b",
-    re.IGNORECASE,
+from src.llm_client import chat  # noqa: F401 - patch point read by sql_candidate_attempt
+from src.observability.metrics import (  # noqa: F401 - patch points read at call time
+    rag_latency_by_component,
+    rag_sql_execution_errors,
+    rag_sql_fallback_invocations_total,
+    rag_sql_generation_attempts_total,
+    rag_sql_generation_unavailable_total,
+    rag_sql_partial_schema_support_total,
+    rag_sql_schema_guard_abstention_total,
+    rag_sql_unsupported_by_schema_total,
 )
-_JOIN_PATTERN = re.compile(r"\bJOIN\b", re.IGNORECASE)
-_SQL_FENCE = re.compile(r"```(?:sql)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
+from src.retrieval import sql_generation, sql_tool
+from src.retrieval.sql_candidate_filters import _filter_rejection_reasons
+from src.retrieval.sql_candidate_prompt import (
+    SQL_RESPONSE_FORMAT,
+    _supervisor_comparison_sql,
+    _with_required_sql_views,
+)
+from src.retrieval.sql_database import execute_sql, validate_sql
+from src.retrieval.sql_schema import CURATED_VIEW_COLUMNS, assess_schema_coverage
+from src.retrieval.sql_tool_results import _MISSING_SCHEMA_IDENTIFIER
 
+__all__ = [
+    "CURATED_VIEW_COLUMNS",
+    "SQL_FALLBACK_MODEL",
+    "SQL_RESPONSE_FORMAT",
+    "_MISSING_SCHEMA_IDENTIFIER",
+    "_filter_rejection_reasons",
+    "_supervisor_comparison_sql",
+    "_with_required_sql_views",
+    "assess_schema_coverage",
+    "execute_sql",
+    "generate_sql",
+    "text_to_sql_tool",
+    "validate_sql",
+]
 
-def _extract_sql(raw: str) -> str:
-    match = _SQL_FENCE.search(raw)
-    return match.group(1).strip() if match else raw.strip()
+SQL_LLM_TIMEOUT_S = 120.0
+SIMPLE_SQL_LLM_TIMEOUT_S = 45.0
+SQL_VALIDATION_TIMEOUT_S = 5.0
+SQL_EXECUTION_TIMEOUT_S = 5.0
+SQL_FALLBACK_MODEL = "qwen/qwen3-30b-a3b-instruct-2507"
+
+_FACADE = sys.modules[__name__]
 
 
 async def generate_sql(
@@ -30,75 +65,21 @@ async def generate_sql(
     api_key: str,
     base_url: str,
     n_candidates: int = 3,
+    call_timings: list[dict] | None = None,
+    diagnostics: list[dict] | None = None,
+    diagnostic_case_id: int | None = None,
+    generation_status: dict | None = None,
 ) -> list[str]:
-    """Call the cloud LLM to generate n_candidates SQL SELECT statements.
+    """Call the cloud LLM to generate one structured SQL SELECT candidate.
 
     Prompt includes the query and relevant view definitions.
-    Returns a list of candidate SQL strings.
+    Returns a list containing at most one parsed SQL string.
     """
-    view_defs = "\n".join(
-        f"View: {v['view_name']}\n"
-        f"Columns: {', '.join(v.get('columns', []))}\n"
-        f"Description: {v.get('description', '')}"
-        for v in relevant_views
+    return await sql_generation.generate_sql(
+        _FACADE, query, relevant_views, model, api_key, base_url,
+        n_candidates=n_candidates, call_timings=call_timings, diagnostics=diagnostics,
+        diagnostic_case_id=diagnostic_case_id, generation_status=generation_status,
     )
-    prompt = (
-        f"Generate {n_candidates} different SQL SELECT statements that answer the question below.\n"
-        f"Use ONLY the views listed. Do NOT use raw tables.\n\n"
-        f"Available views:\n{view_defs}\n\n"
-        f"Question: {query}\n\n"
-        f"Return each SQL in a separate ```sql ... ``` code block."
-    )
-    raw = await chat(
-        prompt=prompt,
-        model=model,
-        api_key=api_key,
-        base_url=base_url,
-        max_tokens=1024,
-    )
-    candidates = [_extract_sql(block) for block in _SQL_FENCE.findall(raw)]
-    if not candidates:
-        candidates = [_extract_sql(raw)]
-    return [c for c in candidates if c][:n_candidates]
-
-
-async def validate_sql(sql: str, db_url: str) -> tuple[bool, str]:
-    """Validate a SQL statement before execution.
-
-    Rejects DML statements and queries with more than 3 JOINs.
-    Runs EXPLAIN to catch syntax errors. Returns (is_valid, error_message).
-    """
-    if _DML_PATTERN.match(sql):
-        return False, "DML statements are not permitted; only SELECT is allowed."
-    join_count = len(_JOIN_PATTERN.findall(sql))
-    if join_count > 3:
-        return False, f"Query join depth {join_count} exceeds maximum of 3."
-    try:
-        engine = create_async_engine(db_url)
-        async with engine.connect() as conn:
-            await conn.execute(text(f"EXPLAIN {sql}"))
-        await engine.dispose()
-        return True, ""
-    except Exception as exc:
-        return False, str(exc)
-
-
-async def execute_sql(sql: str, db_url: str) -> list[dict]:
-    """Execute a validated SELECT statement and return rows as list[dict].
-
-    Raises RuntimeError on execution failure (self-correction at caller level).
-    """
-    engine = create_async_engine(db_url)
-    try:
-        async with engine.connect() as conn:
-            result = await conn.execute(text(sql))
-            keys = list(result.keys())
-            rows = [dict(zip(keys, row)) for row in result.fetchall()]
-        return rows
-    except Exception as exc:
-        raise RuntimeError(f"SQL execution failed: {exc}") from exc
-    finally:
-        await engine.dispose()
 
 
 async def text_to_sql_tool(
@@ -107,34 +88,16 @@ async def text_to_sql_tool(
     settings: Settings,
     trace_id: str,
     max_attempts: int = 3,
+    simple_sql: bool = False,
 ) -> dict:
     """Orchestrate generate → validate → execute with self-correction.
 
     Tries up to max_attempts candidates. Returns:
       {rows, sql_used, view_names, trace_id} on success.
-      {rows: [], error: str} after max_attempts exhausted.
+      {rows: [], error: str} after max_attempts exhausted, with an authoritative
+      failure_kind when the failure is a schema gap or alias-only rejection.
     """
-    view_names = [v.get("view_name", "") for v in relevant_views]
-    candidates = await generate_sql(
-        query=query,
-        relevant_views=relevant_views,
-        model=settings.cloud_model,
-        api_key=settings.openrouter_api_key,
-        base_url=settings.openrouter_base_url,
-        n_candidates=max_attempts,
+    return await sql_tool.text_to_sql_tool(
+        _FACADE, query, relevant_views, settings, trace_id,
+        max_attempts=max_attempts, simple_sql=simple_sql,
     )
-
-    last_error = "no candidates generated"
-    for sql in candidates:
-        valid, err = await validate_sql(sql, settings.db_url)
-        if not valid:
-            last_error = err
-            continue
-        try:
-            rows = await execute_sql(sql, settings.db_url)
-            return {"rows": rows, "sql_used": sql, "view_names": view_names, "trace_id": trace_id}
-        except RuntimeError as exc:
-            rag_sql_execution_errors.inc()
-            last_error = str(exc)
-
-    return {"rows": [], "error": last_error}
